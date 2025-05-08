@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "required": [
+    "main_workflow_path"
+  ],
+  "properties": {
+    "main_workflow_path": {"type": "string"},
+    "environment": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "pipeline_parameters": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "nextflow_parameters": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "input_samplesheet_content": { "type": "string" }
+  },
+  "additionalProperties": false
+}

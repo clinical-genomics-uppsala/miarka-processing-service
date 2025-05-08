@@ -1,0 +1,23 @@
+---
+
+main_workflow_path: ./seqreports/main.nf
+# Note that in the following sections it is possible to do variable subsitution
+# on the following variables:
+# - {runfolder_name}
+# - {runfolder_path}
+# - {current_year}
+# - {input_samplesheet_path}
+environment:
+  NXF_TEMP: /tmp/
+  NXF_WORK: /tmp/nf_work/
+  NXF_ANSI_LOG: "false"
+pipeline_parameters:
+  run_folder: "{runfolder_path}"
+  config_dir: ./seqreports/config/
+  fastqscreen_databases: /opt/FastQ_Screen_Genomes/
+  checkqc_config: /etc/checkqc/config.yaml
+  result_dir: "{runfolder_path}/reports"
+  script_dir: ./seqreports/bin/
+nextflow_parameters:
+  config: ./seqreports/config/nextflow.config
+  profile: singularity,snpseq
