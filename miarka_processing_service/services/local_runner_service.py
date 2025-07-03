@@ -131,6 +131,35 @@ class LocalRunnerService:
         loop = asyncio.get_running_loop()
         loop.create_task(self._start_process(job_id))
         return job_id
+    
+    def start_runscript(
+        self,
+        runscript,
+        inbox_path,
+        pipeline_params=None,
+    ):
+        """
+        Start a new job for the specified runfolder
+        :param pipeline: name of the pipeline to run
+        :param runfolder_path: path to the runfolder to process
+        :param input_samplesheet_content: content of the input samplesheet
+        :param ext_args: extra args to append to the nextflow command
+        :return: the job id of the started job
+        """
+        with self._job_repo_factory() as job_repo:
+            cmd = "bash {} --inbox-path {} {}".format(runscript, 
+                                                           inbox_path,
+                                                             pipeline_params)
+            #No env specified
+            env = None
+            bash_cmd = {"command": cmd}
+            job_id = job_repo.add_job(command_with_env=bash_cmd).job_id
+        print(bash_cmd)
+        log.debug("calling start_process with id %s" % str(job_id))
+        #loop = asyncio.get_running_loop()
+        loop = asyncio.new_event_loop()
+        loop.create_task(self._start_process(job_id))
+        return job_id
 
     def stop(self, job_id):
         """

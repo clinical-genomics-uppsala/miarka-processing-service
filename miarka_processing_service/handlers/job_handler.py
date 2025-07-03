@@ -187,3 +187,64 @@ class JobStopHandler(BaseRestHandler):
                 f"{self.reverse_url('one_job', job_id)}",
             'version': version,
         })
+
+
+class JobStartAnalysisHandler(BaseRestHandler):
+    """
+            Posting to this endpoint will start a job for the provided pipeline on
+        the provided runfolder, e.g.:
+            curl -X POST -w'\n' localhost:9999/api/1.0/jobs/start/socks/foo_runfolder
+        The endpoint will then return a link where the run can be monitored:
+            {"link": "http://localhost:9999/api/1.0/jobs/130"}
+
+        This endpoint also support the following parameters:
+            - `input_samplesheet_content`: content of the nf-core input samplesheet to
+            input to the pipeline
+            - `ext_args`: extra arguments to pass to the pipeline
+    """
+    def initialize(self, runner_service, **kwargs):
+        """
+        Initalize a new instance of JobStartHandler.
+        """
+        self.runner_service = runner_service
+
+    def post(self):
+        """
+        Posting to this endpoint will start a job for the provided pipeline on
+        the provided runfolder, e.g.:
+            curl -X POST -w'\n' localhost:9999/api/1.0/jobs/start/socks/foo_runfolder
+        The endpoint will then return a link where the run can be monitored:
+            {"link": "http://localhost:9999/api/1.0/jobs/130"}
+
+        This endpoint also support the following parameters:
+            - `input_samplesheet_content`: content of the nf-core input samplesheet to
+            input to the pipeline
+            - `ext_args`: extra arguments to pass to the pipeline
+        """
+        try:
+            request_data = self.body_as_object()
+
+            params=request_data.get("parameters", "")
+
+            if params != "":
+                params=request_data.get("parameters").split(" ")
+
+            job_id = self.runner_service.start_runscript(
+                    runscript=request_data.get("runscript", ""),
+                    inbox_path=request_data.get("inbox_path", ""),
+                    pipeline_params=params)
+            self.set_status(status_code=ACCEPTED)
+            self.write_object(
+                {
+                    "link":
+                        f"{self.request.protocol}://"
+                        f"{self.request.host}"
+                        f"{self.reverse_url('one_job', job_id)}",
+                    'version': version,
+                }
+            )
+        except (RunfolderNotFound, FileNotFoundError) as exc:
+            raise HTTPError(
+                status_code=NOT_FOUND,
+                log_message=str(exc)
+            ) from exc

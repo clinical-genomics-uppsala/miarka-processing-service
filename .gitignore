@@ -116,3 +116,6 @@ ENV/
 # nextflow related files
 work/
 .nextflow*
+
+# apptainer images
+*.sif

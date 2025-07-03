@@ -54,7 +54,7 @@ class JobRepository:
         """
         job = Job(command=command_with_env['command'],
                   state=State.PENDING,
-                  environment=command_with_env['environment'])
+                  )
         self.session.add(job)
         self.session.commit()
         return job
