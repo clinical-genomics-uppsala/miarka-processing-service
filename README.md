@@ -90,21 +90,18 @@ curl http://<container IP>:8080/api/1.0/version
 ## Run service in apptainer
 ---------------------------
 Build a .sif from the local docker cache. Requires that the image is built with docker build first.
+Or build from Singularity file (preferred).
 ```
 apptainer build miarka-processing-service.sif docker-daemon://miarka-processing-service:latest
+apptainer build service.sif Singularity
 
 ```
 
 Start an instance of the image.
 ```
-apptainer instance start miarka-processing-service.sif \
+apptainer instance start service.sif \
 miarka-processing-service
 
-```
-
-Start service in instance
-```
-apptainer exec instance://miarka-processing-service miarka-processing-service --config /opt/miarka-processing-service/config/ --port 8080 --debug
 ```
 
 Curl service
