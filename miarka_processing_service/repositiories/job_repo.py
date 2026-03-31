@@ -4,7 +4,7 @@ This module contains repository classes related to managing job objects.
 
 import logging
 
-from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+#from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
 from miarka_processing_service.models.db_models import Job, State
 
@@ -52,11 +52,12 @@ class JobRepository:
         :param command_with_env: to start job with
         :return: the created Job
         """
-        job = Job(command=command_with_env['command'],
+        job = Job(command=command_with_env["command"],
                   state=State.PENDING,
                   )
         self.session.add(job)
         self.session.commit()
+        print("This is the command: ",command_with_env["command"] )
         return job
 
     def get_jobs(self):

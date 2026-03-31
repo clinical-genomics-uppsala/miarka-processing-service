@@ -17,7 +17,6 @@ from tornado.process import Subprocess
 
 from miarka_processing_service.models.db_models import State
 from miarka_processing_service.exceptions import UnableToStopJob
-from miarka_processing_service.nextflow import nextflow_command
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ class LocalRunnerService:
     instance.
     """
 
-    def __init__(self, job_repo_factory, pipeline_config_dir, nextflow_log_dirs):
+    def __init__(self, job_repo_factory):
         """
         Create a new instance of LocalRunnerService
         :param: job_repo_factory factory method which can produce new JobRepository instances
@@ -46,92 +45,60 @@ class LocalRunnerService:
         :param: nextflow_log_dirs specifies where nextflow logs should be stored
         """
         self._job_repo_factory = job_repo_factory
-        self._pipeline_config_dir = pipeline_config_dir
-        self._nextflow_log_dirs = nextflow_log_dirs
+                # if not running create
+        #if asyncio.get_running_loop() is None:
+        #    self.loop = asyncio.new_event_loop()
+        #else:
+        #    self.loop = asyncio.get_running_loop()
+        #self._pipeline_config_dir = pipeline_config_dir
+        #self._nextflow_log_dirs = nextflow_log_dirs
 
     async def _start_process(self, job_id):
+        print("Starting something...")
         with self._job_repo_factory() as job_repo:
             job = job_repo.get_job(job_id)
             assert job
 
-            working_dir = os.path.join(
-                self._nextflow_log_dirs, str(job_id))
-            os.mkdir(working_dir)
-            nxf_log = os.path.join(working_dir, "nextflow.out")
-            sys_env = os.environ.copy() or {}
-            job_env = job.environment or {}
-            env = {**sys_env, **job_env}
             cmd = shlex.split(shlex.quote(" ".join(job.command)))
 
             try:
-                with open(nxf_log, "w", encoding="utf-8") as nxf_log_fh:
-                    log.debug("Will start command %s", cmd)
-                    process = Subprocess(
-                        cmd,
-                        stdout=nxf_log_fh,
-                        stderr=nxf_log_fh,
-                        env=env,
-                        cwd=working_dir,
-                        shell=True,
-                    )
+                process = Subprocess(cmd, shell=True)
+                job_repo.set_state_of_job(job_id=job.job_id, state=State.STARTED)
+                job_repo.set_pid_of_job(job.job_id, process.pid)
 
-                    job_repo.set_state_of_job(job_id=job.job_id, state=State.STARTED)
-                    job_repo.set_pid_of_job(job.job_id, process.pid)
+                await process.wait_for_exit()
 
-                    await process.wait_for_exit()
-
-                with open(nxf_log, encoding="utf-8") as log_file:
-                    cmd_log = log_file.read()
 
                 log.info("Successfully completed process: %s", job.command)
                 job_repo.set_state_of_job(
                     job_id=job.job_id,
                     state=State.DONE,
-                    cmd_log=cmd_log,
-                )
+                    )
+
             except subprocess.CalledProcessError:
                 job = job_repo.get_job(job_id)
                 if job.state == State.CANCELLED:
                     return
 
-                with open(nxf_log, encoding="utf-8") as log_file:
-                    cmd_log = log_file.read()
                 log.exception('Job failed with the following error:')
                 job_repo.set_state_of_job(
                     job_id=job_id,
                     state=State.ERROR,
-                    cmd_log=cmd_log,
-                )
+                    )
 
-    def start(
-        self,
-        pipeline,
-        runfolder_path,
-        input_samplesheet_content="",
-        ext_args=None,
-    ):
-        """
-        Start a new job for the specified runfolder
-        :param pipeline: name of the pipeline to run
-        :param runfolder_path: path to the runfolder to process
-        :param input_samplesheet_content: content of the input samplesheet
-        :param ext_args: extra args to append to the nextflow command
-        :return: the job id of the started job
-        """
+
+    def create_directory(self, path):
         with self._job_repo_factory() as job_repo:
-            nf_cmd = nextflow_command(
-                pipeline,
-                runfolder_path,
-                self._pipeline_config_dir,
-                input_samplesheet_content,
-                ext_args,
-            )
-            job_id = job_repo.add_job(command_with_env=nf_cmd).job_id
+            bash_cmd = {"command": ["mkdir",path]}
+            job_id = job_repo.add_job(command_with_env=bash_cmd).job_id
+
         log.debug("calling start_process with id %s" % str(job_id))
-        loop = asyncio.get_running_loop()
+        loop = asyncio.get_event_loop()
         loop.create_task(self._start_process(job_id))
+
         return job_id
-    
+
+
     def start_runscript(
         self,
         runscript,
@@ -147,18 +114,15 @@ class LocalRunnerService:
         :return: the job id of the started job
         """
         with self._job_repo_factory() as job_repo:
-            cmd = "bash {} --inbox-path {} {}".format(runscript, 
-                                                           inbox_path,
-                                                             pipeline_params)
-            #No env specified
-            env = None
-            bash_cmd = {"command": cmd}
+            bash_cmd = {"command": ["bash",runscript,"--inbox-path",inbox_path,pipeline_params]}
+            #bash_cmd = {"command": cmd}
+            print("bash_cmd: ",bash_cmd)
             job_id = job_repo.add_job(command_with_env=bash_cmd).job_id
-        print(bash_cmd)
+
         log.debug("calling start_process with id %s" % str(job_id))
-        #loop = asyncio.get_running_loop()
-        loop = asyncio.new_event_loop()
+        loop = asyncio.get_event_loop()
         loop.create_task(self._start_process(job_id))
+        print(bash_cmd)
         return job_id
 
     def stop(self, job_id):
