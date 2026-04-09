@@ -4,6 +4,9 @@ set -euxo pipefail
 
 echo "RUNNING: wp1 GMS560";
 
+# Initialize variables
+inbox_path=""
+
 # Process options and arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -25,11 +28,11 @@ if [ -z "$inbox_path" ]; then
 fi
 
 i=0
-sleep 5
+sleep 3
 while [ $i -le 5 ];
 do
 	echo "Still running some analysis.."
-	sleep 3
+	sleep 2
 	i=$((i + 1))
 done
 

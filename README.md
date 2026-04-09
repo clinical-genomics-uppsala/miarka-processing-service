@@ -11,6 +11,11 @@ conda activate miarka-processing-service
 pip3 install -r requirements/dev
 pip3 install --editable .
 ```
+Run unit tests
+
+```
+python3.10 -m pytest tests/
+```
 
 ### setup.py
 Note that the use of the python command with a setup.py is being deprecated in October 2025.
@@ -31,19 +36,32 @@ python -m pip install --editable .
 ```
 
 ### Starting the service
-Start the service with running the following command inside the conda environment:
+Start the service by running the following command inside the conda environment:
 
 ```
-miarka-processing-service --config config/ --port 8080 --debug
+miarka-processing-service --config config/ --port 9999 --debug
 ```
 A service log will be created in miarka-processing-service.log
 
 Make sure the service is responding by running the following command.
 
 ```
-curl http://localhost:8080/api/1.0/version
+curl http://localhost:9999/api/1.0/version
 ```
 
+## Get status of job/jobs
+
+To get info on a specific job and its status:
+
+```
+curl "http://localhost:9999/api/1.0/jobs/6" | python3 -m json.tool
+```
+
+To get info on a all jobs and their status:
+
+```
+curl "http://localhost:9999/api/1.0/jobs/" | python3 -m json.tool
+```
 
 ### WIP: Transfer venv to miarka
 
