@@ -59,7 +59,7 @@ http://localhost:9999/api/1.0/jobs/create_directory/
 
 A dummy script is available in the tests directory in this repository.
 ```
-curl -X POST -w '\n' --data '{"runscript": "miarka-processing-service/tests/resources/scripts/start_wp1_GMS560.sh", "inbox_path": "miarka-processing-service/tests/resources/inbox/project1"}' \
+curl -X POST -w '\n' --data '{"runscript": "/path/to/miarka-processing-service/tests/resources/scripts/start_wp1_GMS560.sh", "inbox_path": "/path/to/miarka-processing-service/tests/resources/inbox/project1"}' \
 http://localhost:9999/api/1.0/jobs/start_analysis/
 ```
 
