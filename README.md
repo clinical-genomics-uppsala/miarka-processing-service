@@ -17,7 +17,21 @@ Run unit tests
 python3.10 -m pytest tests/
 ```
 
-### setup.py
+### Starting the service
+Start the service by running the following command inside the conda environment:
+
+```
+miarka-processing-service --config config/ --port 9999 --debug
+```
+A service log will be created in miarka-processing-service.log
+
+Make sure the service is responding by running the following command.
+
+```
+curl http://localhost:9999/api/1.0/version
+```
+
+### Sidenote: setup.py
 Note that the use of the python command with a setup.py is being deprecated in October 2025.
 The information in setup.py can still be used as is but with pip instead.
 TODO: Convert setup.py to pyproject.toml (recommended but nor required)
@@ -35,26 +49,33 @@ python -m pip install .
 python -m pip install --editable .
 ```
 
-### Starting the service
-Start the service by running the following command inside the conda environment:
+## Create directory
 
 ```
-miarka-processing-service --config config/ --port 9999 --debug
+curl -X POST -w '\n' --data '{"path": "/absolute/path/to/directory/to/be/created" }' \
+http://localhost:9999/api/1.0/jobs/create_directory/
 ```
-A service log will be created in miarka-processing-service.log
+## Start a runscript
 
-Make sure the service is responding by running the following command.
-
+A dummy script is available in the tests directory in this repository.
 ```
-curl http://localhost:9999/api/1.0/version
+curl -X POST -w '\n' --data '{"runscript": "miarka-processing-service/tests/resources/scripts/start_wp1_GMS560.sh", "inbox_path": "miarka-processing-service/tests/resources/inbox/project1"}' \
+http://localhost:9999/api/1.0/jobs/start_analysis/
 ```
 
 ## Get status of job/jobs
 
+POST operations like create directory and start run script will both return a json-object containing a job id.
+The job id is an int that can be used to get the status of the job.
+
+```
+{"link": "http://localhost:9999/api/1.0/jobs/12", "version": "1.5.2"}
+```
+
 To get info on a specific job and its status:
 
 ```
-curl "http://localhost:9999/api/1.0/jobs/6" | python3 -m json.tool
+curl "http://localhost:9999/api/1.0/jobs/12" | python3 -m json.tool
 ```
 
 To get info on a all jobs and their status:
