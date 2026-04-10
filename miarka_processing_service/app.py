@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 from tornado.web import URLSpec as url
-from tornado.ioloop import PeriodicCallback
+#from tornado.ioloop import PeriodicCallback
 
 from arteria.web.app import AppService
 
@@ -19,11 +19,9 @@ from alembic.command import upgrade as upgrade_db
 
 from miarka_processing_service.handlers.version_handler import VersionHandler
 from miarka_processing_service.handlers.job_handler import OneJobHandler, ManyJobHandler,\
-    JobStartHandler, JobStopHandler
-from miarka_processing_service.handlers.reports_handler import ReportFileHandler, ReportsHandler
+    JobStopHandler, JobStartAnalysisHandler, CreateDirectoryHandler
 from miarka_processing_service.services.local_runner_service import LocalRunnerService
 from miarka_processing_service.repositiories.job_repo import JobRepository
-from miarka_processing_service.repositiories.reports_repo import ReportsRepository
 from miarka_processing_service.repositiories.runfolder_repo import RunfolderRepository
 from miarka_processing_service.exceptions import ConfigurationError
 
@@ -39,15 +37,13 @@ def routes(**kwargs):
     """
     return [
         url(r"/api/1.0/version", VersionHandler, name="version", kwargs=kwargs),
-        url(r"/api/1.0/jobs/start/(\w+)/(?!.*\/)(.*)$", JobStartHandler, name="job_start", kwargs=kwargs),
         url(r"/api/1.0/jobs/stop/(\d+)$", JobStopHandler, name="job_stop", kwargs=kwargs),
         url(r"/api/1.0/jobs/(\d+)$", OneJobHandler, name="one_job", kwargs=kwargs),
         url(r"/api/1.0/jobs/$", ManyJobHandler, name="many_jobs", kwargs=kwargs),
-        url(r"/reports/(?!.*\/)(.*)$", ReportsHandler, name="all_reports", kwargs=kwargs),
-        # Path is a required argument for the ReportsHandler (because it is subclassing the
-        # static content handler, but it is not used. We use the configured repositories
-        # to find the correct path for the report to serve. /JD 2018-11-27
-        url(r"/reports/(.*)/$", ReportFileHandler, name="report", kwargs={**{'path': 'thisisnotused'}, **kwargs})
+        # Following endpoints are added by CGU and are in some cases more or less copies
+        # of already existing endpoints listed above.
+        url(r"/api/1.0/jobs/start_analysis/", JobStartAnalysisHandler, name="job_start_analysis", kwargs=kwargs),
+        url(r"/api/1.0/jobs/create_directory/", CreateDirectoryHandler, name="job_create_directory", kwargs=kwargs), 
     ]
 
 
@@ -107,28 +103,23 @@ def configure_routes(config):
                           alembic_script_location=alembic_scripts_path)
 
     log.info("Setup connection to db")
-    session_factory = scoped_session(sessionmaker())
+    session_factory = scoped_session(sessionmaker(expire_on_commit=False))
     session_factory.configure(bind=engine)
 
     job_repo_factory = functools.partial(JobRepository, session_factory=session_factory)
     local_runner_service = LocalRunnerService(
-        job_repo_factory,
-        config['pipeline_config_dir'],
-        config['nextflow_log_dirs'],
-    )
+        job_repo_factory
+        )
 
     monitored_dirs = get_key_from_config(config, 'monitored_directories')
     runfolder_repo = RunfolderRepository(monitored_dirs)
-    reports_dir = get_key_from_config(config, 'reports_dir')
-    reports_repo = ReportsRepository(reports_dir=reports_dir)
 
     with job_repo_factory() as job_repo:
         job_repo.clear_out_stale_jobs_at_startup()
 
     return routes(config=config,
                   runner_service=local_runner_service,
-                  runfolder_repo=runfolder_repo,
-                  reports_repo=reports_repo)
+                  runfolder_repo=runfolder_repo)
 
 
 def start(package=__package__):

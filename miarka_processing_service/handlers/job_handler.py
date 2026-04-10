@@ -96,58 +96,6 @@ class ManyJobHandler(BaseRestHandler):
         self.write_object({"jobs": jobs_as_dicts, "version": version})
 
 
-class JobStartHandler(BaseRestHandler):
-    """
-    Handle starting jobs.
-    """
-
-    def initialize(self, runner_service, runfolder_repo, **kwargs):
-        """
-        Initalize a new instance of JobStartHandler.
-        """
-        self.runner_service = runner_service
-        self.runfolder_repo = runfolder_repo
-
-    def post(self, pipeline, runfolder):
-        """
-        Posting to this endpoint will start a job for the provided pipeline on
-        the provided runfolder, e.g.:
-            curl -X POST -w'\n' localhost:9999/api/1.0/jobs/start/socks/foo_runfolder
-        The endpoint will then return a link where the run can be monitored:
-            {"link": "http://localhost:9999/api/1.0/jobs/130"}
-
-        This endpoint also support the following parameters:
-            - `input_samplesheet_content`: content of the nf-core input samplesheet to
-            input to the pipeline
-            - `ext_args`: extra arguments to pass to the pipeline
-        """
-        try:
-            request_data = self.body_as_object()
-            runfolder_path = self.runfolder_repo.get_runfolder(runfolder)
-
-            job_id = self.runner_service.start(
-                    pipeline,
-                    runfolder_path=runfolder_path,
-                    input_samplesheet_content=request_data.get("input_samplesheet_content", ""),
-                    ext_args=request_data.get("ext_args", "").split(" "),
-                    )
-            self.set_status(status_code=ACCEPTED)
-            self.write_object(
-                {
-                    "link":
-                        f"{self.request.protocol}://"
-                        f"{self.request.host}"
-                        f"{self.reverse_url('one_job', job_id)}",
-                    'version': version,
-                }
-            )
-        except (RunfolderNotFound, FileNotFoundError) as exc:
-            raise HTTPError(
-                status_code=NOT_FOUND,
-                log_message=str(exc)
-            ) from exc
-
-
 class JobStopHandler(BaseRestHandler):
     """
     Handle stopping jobs. This will stops jobs which are eligible for stopping,
@@ -187,3 +135,120 @@ class JobStopHandler(BaseRestHandler):
                 f"{self.reverse_url('one_job', job_id)}",
             'version': version,
         })
+
+
+class JobStartAnalysisHandler(BaseRestHandler):
+    """
+            Posting to this endpoint will start a job for the provided pipeline on
+        the provided runfolder, e.g.:
+            curl -X POST -w'\n' localhost:9999/api/1.0/jobs/start/socks/foo_runfolder
+        The endpoint will then return a link where the run can be monitored:
+            {"link": "http://localhost:9999/api/1.0/jobs/130"}
+
+        This endpoint also support the following parameters:
+            - `input_samplesheet_content`: content of the nf-core input samplesheet to
+            input to the pipeline
+            - `ext_args`: extra arguments to pass to the pipeline
+
+    TODO:
+    Information from workflow variables that has to be sent to processing-service
+    to be able to start an analysis.
+
+    run_analysis_miarka:
+        action: ductus.run_analysis_miarka_action
+        input:
+            runfolder: <% ctx(runfolder) %>
+            experiment_name: <% ctx(experiment_name) %>
+            workpackage: <% ctx(workpackage) %>
+            analysis: <% ctx(analysis) %>
+            process_settings: <% ctx(process_settings) %>
+            mail_bioinfo: <% ctx(mail_bioinfo) %>
+
+    curl -X POST -w '\n' --data '{
+        "runscript": "<% ctx(process_settings).get(ctx(workpackage)).get(ctx(analysis)).get('run_script') %>",
+        "inbox_path": "<% ctx(runfolder) %>",
+        "parameters": "<% ctx(process_settings).get(ctx(workpackage)).get(ctx(analysis)).get('parameters') %>" }' \
+        http://localhost:11010/api/1.0/jobs/start_analysis/
+
+    """
+    def initialize(self, runner_service, **kwargs):
+        """
+        Initalize a new instance of JobStartHandler.
+        """
+        self.runner_service = runner_service
+
+    def post(self):
+        """
+        Posting to this endpoint will start a job for the provided pipeline on
+        the provided runfolder, e.g.:
+            curl -X POST -w'\n' localhost:9999/api/1.0/jobs/start/socks/foo_runfolder
+        The endpoint will then return a link where the run can be monitored:
+            {"link": "http://localhost:9999/api/1.0/jobs/130"}
+
+        This endpoint also support the following parameters:
+            - `input_samplesheet_content`: content of the nf-core input samplesheet to
+            input to the pipeline
+            - `ext_args`: extra arguments to pass to the pipeline
+        """
+        try:
+            request_data = self.body_as_object()
+
+            params=request_data.get("parameters", "")
+
+            if params != "":
+                params=request_data.get("parameters").split(" ")
+
+            job_id = self.runner_service.start_runscript(
+                    runscript=request_data.get("runscript", ""),
+                    inbox_path=request_data.get("inbox_path", ""),
+                    pipeline_params=params)
+            self.set_status(status_code=ACCEPTED)
+            self.write_object(
+                {
+                    "link":
+                        f"{self.request.protocol}://"
+                        f"{self.request.host}"
+                        f"{self.reverse_url('one_job', job_id)}",
+                    'version': version,
+                }
+            )
+        except (RunfolderNotFound, FileNotFoundError) as exc:
+            raise HTTPError(
+                status_code=NOT_FOUND,
+                log_message=str(exc)
+            ) from exc
+
+
+class CreateDirectoryHandler(BaseRestHandler):
+    "Class to handle creation of directories associated with analysis on miarka."
+
+    def initialize(self, runner_service, **kwargs):
+        """
+        Initalize a new instance of JobStartHandler.
+        """
+        self.runner_service = runner_service
+
+    def post(self):
+        """   
+        curl -X POST -w '\n' --data '{"path": "<% ctx(analysis_folder_path) %>" }' \
+        http://localhost:11010/api/1.0/jobs/create_directory/
+        """
+        try:
+            request_data = self.body_as_object()
+            job_id = self.runner_service.create_directory(path=request_data.get("path", ""))
+            self.set_status(status_code=ACCEPTED)
+            self.write_object(
+                {
+                    "link":
+                        f"{self.request.protocol}://"
+                        f"{self.request.host}"
+                        f"{self.reverse_url('one_job', job_id)}",
+                    'version': version,
+                }
+            )
+
+        except (Exception) as exc:
+            raise HTTPError(
+                status_code=NOT_FOUND,
+                log_message=str(exc)
+            ) from exc

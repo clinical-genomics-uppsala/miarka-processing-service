@@ -38,3 +38,9 @@ class NextflowConfigError(ConfigurationError):
     Exception thrown when there is a problem with the configuration of the nextflow job.
     """
     pass
+
+
+class CreateDirectoryError(Exception):
+    """
+    Exception thrown when there is a problem with creating a directory on miarka.
+    """
