@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "miarka_processing_service"
+version = "0.0.1"
+description = "Service to perform operations on miarka."
+readme = "README.md"
+keywords = ["bioinformatics"]
+authors = [{ name = "CGU, Uppsala University" }]
+requires-python = ">=3.10"
+dependencies = [
+    "wheel==0.37.1",
+    "arteria==1.1.4",
+    "sqlalchemy==1.4.41",
+    "alembic==1.8.1",
+    "jsonschema==4.19",
+    "tornado==6.4.2",
+]
+
+[project.scripts]
+miarka-processing-service = "miarka_processing_service.app:start"
+
+[tool.setuptools.packages.find]
+include = ["miarka_processing_service*"]
+
+[project.optional-dependencies]
+dev = [
+    "bumpversion==0.6.0",
+    "flake8==6.0.0",
+    "coverage==7.2.7",
+    "Sphinx==5.3.0",
+    "twine==4.0.2",
+    "pytest==7.4.0",
+    "pytest-runner==6.0.0",
+    "pytest-asyncio==0.21.1",
+    "mock",
+]
