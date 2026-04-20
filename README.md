@@ -84,20 +84,31 @@ To get info on a all jobs and their status:
 curl "http://localhost:9999/api/1.0/jobs/" | python3 -m json.tool
 ```
 
-### WIP: Transfer venv to miarka
+### Transfer to miarka
+
+Download/copy the script build/build_conda.sh to an empty directory on your local computer. Run with bash.
 
 ```
-#on marvin
-python3.12 -m venv --copies venv
-source venv/bin/activate
-(venv) venv/bin/pip3.12 install -r requirements/prod
-(venv) pip3.12 install venv-pack2
-(venv) venv-pack -o venv.zip
+bash build_conda.sh
+```
+The script will clone the given branch (set in script, dev is default) of the repo.
+Create a conda environment, install requirements, pack the environment and finally also pack the service code.
+Everything needed is in the file miarka-processing-service.tar.gz. Rsync miarka-processing-service.tar.gz to miarka.
 
-#Rsync zip-file to miarka and unpack
-python3.12 -m zipfile -e venv.zip venv/
-source venv/bin/activate
+Extract the compressed archives on miarka.
 
+```
+tar -xvf miarka-processing-service.tar.gz
+cd miarka-processing-service
+mkdir env
+tar -xvf env.tar.gz -C env
+```
+
+Unpack the environment
+
+```
+source env/bin/activate
+conda-unpack
 ```
 
 ## Set-up using the Dockerfile
