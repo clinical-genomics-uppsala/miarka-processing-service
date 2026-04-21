@@ -2,19 +2,19 @@
 Microservice to perform operations like moving files and starting pipelines on miarka.
 
 # Setup
-## Setup in conda environment
+## Setup in conda environment (on local machine)
 After cloning the repository, do the following to setup the conda environment.
 
 ```
-conda create -n miarka-processing-service python=3.10
+conda create -n miarka-processing-service python=3.12
 conda activate miarka-processing-service
-pip3 install -r requirements/dev
+pip3 install -r requirements/dev #skip this if to run code in production
 pip3 install --editable .
 ```
-Run unit tests
+Run unit tests in dev environment.
 
 ```
-python3.10 -m pytest tests/
+python3.12 -m pytest tests/
 ```
 
 ### Starting the service
@@ -29,24 +29,6 @@ Make sure the service is responding by running the following command.
 
 ```
 curl http://localhost:9999/api/1.0/version
-```
-
-### Sidenote: setup.py
-Note that the use of the python command with a setup.py is being deprecated in October 2025.
-The information in setup.py can still be used as is but with pip instead.
-TODO: Convert setup.py to pyproject.toml (recommended but nor required)
-See, https://packaging.python.org/en/latest/guides/modernize-setup-py-project/#
-
-```
-# Deprecated commands...
-
-python setup.py install
-python setup.py develop
-
-#...can be replaced by
-
-python -m pip install .
-python -m pip install --editable .
 ```
 
 ## Create directory
@@ -84,19 +66,32 @@ To get info on a all jobs and their status:
 curl "http://localhost:9999/api/1.0/jobs/" | python3 -m json.tool
 ```
 
-### WIP: Transfer venv to miarka
+### Transfer to miarka
+
+Download/copy the script build/build_conda.sh to an empty directory on your local computer. Run with bash.
 
 ```
-#on marvin
-python3.12 -m venv --copies venv
-source venv/bin/activate
-(venv) venv/bin/pip3.12 install -r requirements/prod
-(venv) pip3.12 install venv-pack2
-(venv) venv-pack -o venv.zip
+bash build_conda.sh
+```
+The script will clone the given branch (set in script, dev is default) of the repo.
+Create a conda environment, install requirements, pack the environment and finally also pack the service code.
+Everything needed is in the file miarka-processing-service.tar.gz. Rsync miarka-processing-service.tar.gz to miarka.
 
-#Rsync zip-file to miarka and unpack
-python3.12 -m zipfile -e venv.zip venv/
-source venv/bin/activate
+Extract the compressed archives on miarka.
+
+```
+tar -xvf miarka-processing-service.tar.gz
+cd miarka-processing-service
+mkdir env
+tar -xvf env.tar.gz -C env
+```
+
+Unpack the environment and start service
+
+```
+source env/bin/activate
+conda-unpack
+miarka-processing-service --config config/ --port 11010 --debug
 
 ```
 
