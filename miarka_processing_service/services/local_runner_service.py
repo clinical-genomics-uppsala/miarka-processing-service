@@ -121,23 +121,38 @@ class LocalRunnerService:
 
     def start_runscript(
         self,
+        *,
+        analysis_path,
         runscript,
         inbox_path,
         pipeline_params=None,
     ):
         """
         Start a new job for the specified runfolder
+        :param analysis_path: Path where the runscript will be executed
         :param runscript: Path to pipeline runscript
         :param inbox_path: Path to the runfolder to process
         :param pipeline_params: extra args to append to the pipeline
         :return: the job id of the started job
         """
+        if not os.path.exists(analysis_path):
+            raise FileNotFoundError(f"Analysis path does not exist: {analysis_path}")
+        if not os.path.isfile(runscript):
+            raise FileNotFoundError(f"Runscript does not exist or is not a file: {runscript}")
+        if not os.path.exists(inbox_path):
+            raise FileNotFoundError(f"Inbox path does not exist: {inbox_path}")
+
         with self._job_repo_factory() as job_repo:
-            command = ["bash", runscript, "--inbox-path", inbox_path]
+            # Build the command to be executed within the analysis directory
+            inner_command = ["bash", runscript, "--inbox-path", inbox_path]
             if pipeline_params:
                 # Flatten params if they are provided as a list
-                command.extend(pipeline_params if isinstance(pipeline_params, list) else [pipeline_params])
-            bash_cmd = {"command": command}
+                inner_command.extend(pipeline_params if isinstance(pipeline_params, list) else [pipeline_params])
+
+            # Use 'bash -c' to ensure that shell operators like '&&' are correctly interpreted.
+            # This prevents shlex.join from escaping them as literal arguments in _start_process.
+            full_cmd_str = f"cd {shlex.quote(analysis_path)} && {shlex.join(inner_command)}"
+            bash_cmd = {"command": ["bash", "-c", full_cmd_str]}
             job_id = job_repo.add_job(command_in=bash_cmd).job_id
 
         log.debug("calling start_process with id %s" % str(job_id))

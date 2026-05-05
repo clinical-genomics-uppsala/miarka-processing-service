@@ -179,16 +179,14 @@ class JobStartAnalysisHandler(BaseRestHandler):
 
     def post(self):
         """
-        Posting to this endpoint will start a job for the provided pipeline on
+        Posting to this endpoint will start a job for the provided runscript on
         the provided runfolder, e.g.:
             curl -X POST -w'\n' localhost:9999/api/1.0/jobs/start/socks/foo_runfolder
         The endpoint will then return a link where the run can be monitored:
             {"link": "http://localhost:9999/api/1.0/jobs/130"}
 
         This endpoint also support the following parameters:
-            - `input_samplesheet_content`: content of the nf-core input samplesheet to
-            input to the pipeline
-            - `ext_args`: extra arguments to pass to the pipeline
+        TODO: 
         """
         try:
             request_data = self.body_as_object()
@@ -199,6 +197,7 @@ class JobStartAnalysisHandler(BaseRestHandler):
                 params=request_data.get("parameters").split(" ")
 
             job_id = self.runner_service.start_runscript(
+                    analysis_path=request_data.get("analysis_path", ""),
                     runscript=request_data.get("runscript", ""),
                     inbox_path=request_data.get("inbox_path", ""),
                     pipeline_params=params)

@@ -36,6 +36,10 @@ do
 	i=$((i + 1))
 done
 
+touch Done.txt
+echo 'ANALYSIS DONE: wp1 GMS560' >> Done.txt
+date >> Done.txt
+
 echo "ANALYSIS DONE: wp1 GMS560";
 
 
