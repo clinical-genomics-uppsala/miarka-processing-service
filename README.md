@@ -66,6 +66,34 @@ To get info on a all jobs and their status:
 curl "http://localhost:9999/api/1.0/jobs/" | python3 -m json.tool
 ```
 
+### Logging configuration
+
+Logging is configured in `config/logger.config` (or whichever directory is passed via `--config`).
+The default setup writes to `miarka-processing-service.log` in the working directory with midnight rotation.
+
+**Log file path** — set `filename` to the full absolute path of the log file in `file_handler`:
+```yaml
+filename: /var/log/miarka-processing-service/miarka-processing-service.log
+```
+The default is a relative path, which places the file in whatever directory the service is started from — use an absolute path in production.
+
+**Time-based rotation** (default) — controlled by `when`, `interval`, and `backupCount`:
+```yaml
+class: logging.handlers.TimedRotatingFileHandler
+when: midnight   # S, M, H, D, midnight, W0-W6
+interval: 1
+backupCount: 30
+```
+
+**Size-based rotation** — replace the `file_handler` block with:
+```yaml
+class: logging.handlers.RotatingFileHandler
+maxBytes: 10485760  # 10 MB
+backupCount: 20
+```
+
+A commented-out size-based example is included in `config/logger.config` for reference.
+
 ### Transfer to miarka
 
 Download/copy the script build/build_conda.sh to an empty directory on your local computer. Run with bash.
