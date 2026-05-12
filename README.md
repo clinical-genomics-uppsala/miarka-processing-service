@@ -95,6 +95,73 @@ miarka-processing-service --config config/ --port 11010 --debug
 
 ```
 
+## Configure database
+
+The database location is set via `db_connection_string` in `config/app.config`. The config file and database must both survive deployments and should not live inside the application source tree.
+
+Migrations are applied automatically on service startup — no manual migration step is needed after deployment.
+
+### SQLite
+
+The default config uses a relative path which will be overwritten on redeploy. Use an absolute path outside the deployment directory:
+
+```yaml
+db_connection_string: sqlite:////var/lib/miarka-processing-service/jobs.db
+```
+
+Note the four slashes: `sqlite://` followed by the absolute path `/var/lib/...`. The directory must exist and be writable before starting the service.
+
+### PostgreSQL
+
+Install the driver and update the connection string:
+
+```bash
+pip install psycopg2-binary
+```
+
+```yaml
+db_connection_string: postgresql://user:password@host:5432/miarka_db
+```
+
+The database must be created beforehand (`CREATE DATABASE miarka_db`). Tables will be created automatically on first startup.
+
+### MySQL / MariaDB
+
+```bash
+pip install mysqlclient
+```
+
+```yaml
+db_connection_string: mysql://user:password@host:3306/miarka_db
+```
+
+## Set-up as a system service
+
+When running directly on the host (not in a container), the database and configuration must be stored in a dedicated directory outside the application source tree so they are not overwritten when a new version is deployed. A suitable location is `/var/lib/miarka-processing-service/`.
+
+Point `db_connection_string` in the config to that location (see [Configure database](#configure-database)):
+
+```yaml
+db_connection_string: sqlite:////var/lib/miarka-processing-service/jobs.db
+```
+
+Keep the active config file there as well, and start the service pointing to it:
+
+```bash
+miarka-processing-service --config /var/lib/miarka-processing-service/config/ --port 11010
+```
+
+### Backup before deployment
+
+Before deploying a new version, take a backup of the current database. Name the copy with the running version and today's date so it can be identified and restored if needed:
+
+```bash
+VERSION=$(python -c "from miarka_processing_service import __version__; print(__version__)")
+DATE=$(date +%Y-%m-%d)
+cp /var/lib/miarka-processing-service/jobs.db \
+   /var/lib/miarka-processing-service/jobs_v${VERSION}_${DATE}.db
+```
+
 ## Set-up using the Dockerfile
 -------------
 ```
