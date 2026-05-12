@@ -19,7 +19,7 @@ from alembic.command import upgrade as upgrade_db
 
 from miarka_processing_service.handlers.version_handler import VersionHandler
 from miarka_processing_service.handlers.job_handler import OneJobHandler, ManyJobHandler,\
-    JobStopHandler, JobStartAnalysisHandler, CreateDirectoryHandler
+    JobStopHandler, JobStartAnalysisHandler, CreateDirectoryHandler, SyncDirectoryHandler
 from miarka_processing_service.services.local_runner_service import LocalRunnerService
 from miarka_processing_service.repositiories.job_repo import JobRepository
 from miarka_processing_service.repositiories.runfolder_repo import RunfolderRepository
@@ -43,7 +43,8 @@ def routes(**kwargs):
         # Following endpoints are added by CGU and are in some cases more or less copies
         # of already existing endpoints listed above.
         url(r"/api/1.0/jobs/start_analysis/", JobStartAnalysisHandler, name="job_start_analysis", kwargs=kwargs),
-        url(r"/api/1.0/jobs/create_directory/", CreateDirectoryHandler, name="job_create_directory", kwargs=kwargs), 
+        url(r"/api/1.0/jobs/create_directory/", CreateDirectoryHandler, name="job_create_directory", kwargs=kwargs),
+        url(r"/api/1.0/jobs/sync_directory/", SyncDirectoryHandler, name="job_sync_directory", kwargs=kwargs),
     ]
 
 

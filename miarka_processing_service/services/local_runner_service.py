@@ -8,6 +8,8 @@ import subprocess
 import os
 import signal
 import shlex
+import glob
+
 
 from miarka_processing_service.models.db_models import State
 from miarka_processing_service.exceptions import UnableToStopJob
@@ -153,6 +155,37 @@ class LocalRunnerService:
             # This prevents shlex.join from escaping them as literal arguments in _start_process.
             full_cmd_str = f"cd {shlex.quote(analysis_path)} && {shlex.join(inner_command)}"
             bash_cmd = {"command": ["bash", "-c", full_cmd_str]}
+            job_id = job_repo.add_job(command_in=bash_cmd).job_id
+
+        log.debug("calling start_process with id %s" % str(job_id))
+        loop = asyncio.get_event_loop()
+        loop.create_task(self._start_process(job_id))
+        return job_id
+
+    def sync_directory(self, 
+                       *,
+                       source_path,
+                       destination_path,
+                       filter,
+                       may_exist_filter):
+        filter_file = os.path.join(source_path, "files_to_outbox.txt")
+        if filter:
+            with open(filter_file, "a") as f:
+                f.write("\n".join(filter))
+        if may_exist_filter:
+            for pattern in may_exist_filter:
+                if glob.glob(os.path.join(source_path, pattern)):
+                    with open(filter_file, "a") as f:
+                        f.write("\n".join(pattern))
+
+        if os.path.exists(filter_file):
+            bash_cmd = {"command": ["rsync", "-avP",
+                                    "--include-from=", filter_file,
+                                    "--exclude=*", source_path, destination_path]}
+        else:
+            bash_cmd = {"command": ["rsync", "-avP", source_path, destination_path]}
+
+        with self._job_repo_factory() as job_repo:
             job_id = job_repo.add_job(command_in=bash_cmd).job_id
 
         log.debug("calling start_process with id %s" % str(job_id))

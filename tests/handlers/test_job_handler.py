@@ -26,6 +26,7 @@ class TestJobHandler(AsyncHTTPTestCase):
         mock_runner_service.get_job = mock.MagicMock(return_value=job)
         mock_runner_service.start_runscript = mock.MagicMock(return_value=job.job_id)
         mock_runner_service.create_directory = mock.MagicMock(return_value=job.job_id)
+        mock_runner_service.sync_directory = mock.MagicMock(return_value=job.job_id)
         mock_runner_service.stop = mock.MagicMock(return_value=job)
 
         mock_runfolder_repo = mock.create_autospec(RunfolderRepository)
@@ -79,6 +80,17 @@ class TestJobHandler(AsyncHTTPTestCase):
 
     def test_stop_job(self):
         response = self.fetch('/api/1.0/jobs/stop/1', method='POST', body=json.dumps({}))
+        self.assertEqual(response.code, 202)
+        self.assertDictEqual(
+            json.loads(response.body),
+            {
+                'link': self.get_url('/api/1.0/jobs/1'),
+                'version': version,
+            }
+        )
+
+    def test_sync_directory(self):
+        response = self.fetch('/api/1.0/jobs/sync_directory/', method='POST', body=json.dumps({}))
         self.assertEqual(response.code, 202)
         self.assertDictEqual(
             json.loads(response.body),
