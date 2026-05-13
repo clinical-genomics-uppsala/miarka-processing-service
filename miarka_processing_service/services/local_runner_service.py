@@ -168,22 +168,31 @@ class LocalRunnerService:
                        destination_path,
                        filter,
                        may_exist_filter):
+
+        if not os.path.exists(source_path):
+            raise FileNotFoundError(f"Source path does not exist: {source_path}")
+        if not os.path.exists(destination_path):
+            raise FileNotFoundError(f"Destination path does not exist: {destination_path}")
+
         filter_file = os.path.join(source_path, "files_to_outbox.txt")
         if filter:
             with open(filter_file, "a") as f:
-                f.write("\n".join(filter))
+                f.write("\n".join(filter) + "\n")
         if may_exist_filter:
             for pattern in may_exist_filter:
                 if glob.glob(os.path.join(source_path, pattern)):
                     with open(filter_file, "a") as f:
-                        f.write("\n".join(pattern))
+                        f.write(pattern + "\n")
 
         if os.path.exists(filter_file):
             bash_cmd = {"command": ["rsync", "-avP",
-                                    "--include-from=", filter_file,
-                                    "--exclude=*", source_path, destination_path]}
+                                    "--exclude", "*",
+                                    "--include-from", filter_file,
+                                    os.path.join(source_path, ""),
+                                    os.path.join(destination_path, "")]}
+            print(bash_cmd)
         else:
-            bash_cmd = {"command": ["rsync", "-avP", source_path, destination_path]}
+            bash_cmd = {"command": ["rsync", "-avP", os.path.join(source_path, ""), os.path.join(destination_path, "")]}
 
         with self._job_repo_factory() as job_repo:
             job_id = job_repo.add_job(command_in=bash_cmd).job_id
