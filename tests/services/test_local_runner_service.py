@@ -327,7 +327,7 @@ class TestLocalRunnerService(object):
             
             with local_runner_service._job_repo_factory() as job_repo:
                 job = job_repo.get_job(job_id)
-                expected_cmd = ["rsync", "-avP", "--exclude", "*", "--include-from", filter_file, source_path, destination_path]
+                expected_cmd = ["rsync", "-avP", "--include-from", filter_file, "--exclude", "*", source_path, destination_path]
             
                 assert job.command == expected_cmd
                 assert job.state == State.PENDING
@@ -346,7 +346,7 @@ class TestLocalRunnerService(object):
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         request_data = {"source_directory": os.path.join(project_root, "tests", "resources", "analysis", "DEF-456"),
                         "destination_directory": os.path.join(project_root, "tests", "resources", "outbox", "DEF-456"),
-                        "filter": ["results", "bam_*", "*config.yaml"],
+                        "filter": ["results/***", "bam_*/***", "*config.yaml"],
                         "may_exist_filter": ["gvcf_*"]}
         
         # Simulate handler getting variables from request_data
