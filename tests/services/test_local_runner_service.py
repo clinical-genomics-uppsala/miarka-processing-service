@@ -105,20 +105,27 @@ class TestLocalRunnerService(object):
 
     def test_start_runscript(self, job_repo_factory):
         local_runner_service = LocalRunnerService(job_repo_factory)
+        analysis_dir = "/data/analysis"
         runscript = "/bin/script.sh"
         inbox = "/data/inbox"
         params = ["--fast", "--debug"]
         
-        with mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop:
-            job_id = local_runner_service.start_runscript(runscript, inbox, params)
+        with mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists", return_value=True), \
+             mock.patch("miarka_processing_service.services.local_runner_service.os.path.isfile", return_value=True), \
+             mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop:
+            job_id = local_runner_service.start_runscript(analysis_path=analysis_dir, runscript=runscript, inbox_path=inbox, pipeline_params=params)
             
             # Close coroutine to silence warning
             mock_loop.return_value.create_task.call_args[0][0].close()
             
             with local_runner_service._job_repo_factory() as job_repo:
                 job = job_repo.get_job(job_id)
-                expected_cmd = ["bash", runscript, "--inbox-path", inbox, "--fast", "--debug"]
+                # The command is now wrapped in bash -c to handle shell operators correctly
+                expected_inner = f"cd {analysis_dir} && bash {runscript} --inbox-path {inbox} --fast --debug"
+                expected_cmd = ["bash", "-c", expected_inner]
                 assert job.command == expected_cmd
+                assert job.state == State.PENDING
+
 
     def test_stop_pending_job(self, job_repo_factory):
         local_runner_service = LocalRunnerService(job_repo_factory)
@@ -214,21 +221,59 @@ class TestLocalRunnerService(object):
         jobs = local_runner_service.get_jobs()
         assert len(jobs) == 2
 
-    @pytest.mark.asyncio
-    async def test_start_runscript_fail_empty_inbox(self, job_repo_factory):
+    def test_start_runscript_fail_empty_inbox(self, job_repo_factory):
         """Verify that an empty inbox-path parameter leads to an ERROR state."""
         local_runner_service = LocalRunnerService(job_repo_factory)
         
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         script_path = os.path.join(project_root, "tests", "resources", "scripts", "start_wp1_GMS560.sh")
         
+        # Validation now happens synchronously in start_runscript
+        # In the "empty inbox" test, I used side_effect=[True, False] for exists. 
+        # This simulates the analysis path existing (the first check) but the inbox path not existing (the third check).
+        with mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists", side_effect=[True, False]), \
+             mock.patch("miarka_processing_service.services.local_runner_service.os.path.isfile", return_value=True):
+            with pytest.raises(FileNotFoundError) as exc:
+                local_runner_service.start_runscript(analysis_path="/data/analysis", runscript=script_path, inbox_path="")
+            assert "Inbox path does not exist" in str(exc.value)
+
+    def test_start_runscript_fail_non_existent_analysis_path(self, job_repo_factory):
+        """Verify that a non existing analysis path leads to a FileNotFoundError."""
+        local_runner_service = LocalRunnerService(job_repo_factory)
+        
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        script_path = os.path.join(project_root, "tests", "resources", "scripts", "start_wp1_GMS560.sh")
+        
+        # Ensure exists returns False for the analysis path
+        with mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists", return_value=False):
+            with pytest.raises(FileNotFoundError) as exc:
+                local_runner_service.start_runscript(analysis_path="mock/path/does/not/exist", 
+                                                     runscript=script_path, 
+                                                     inbox_path="/data/inbox")
+            assert "Analysis path does not exist" in str(exc.value)
+
+    @pytest.mark.asyncio
+    async def test_start_runscript_cd_to_analysis_path(self, job_repo_factory):
+        """Verify that the runscript runs in the analysis directory."""
+        local_runner_service = LocalRunnerService(job_repo_factory)
+        
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        inbox_path = os.path.join(project_root, "tests", "resources", "inbox", "ABC-123")
+        script_path = os.path.join(project_root, "tests", "resources", "scripts", "start_wp1_GMS560.sh")
+        analysis_path = os.path.join(project_root, "tests", "resources", "analysis", "ABC-123")
+
         with mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop:
-            job_id = local_runner_service.start_runscript(script_path, inbox_path="")
-            mock_loop.return_value.create_task.call_args[0][0].close()
+            job_id = local_runner_service.start_runscript(analysis_path=analysis_path,
+                                                          runscript=script_path,
+                                                          inbox_path=inbox_path)
 
-        # Await the processing logic directly to verify it catches the failure
-        await local_runner_service._start_process(job_id)
+            # Capture and close the coroutine created inside start_runscript to prevent RuntimeWarning
+            coro = mock_loop.return_value.create_task.call_args[0][0]
+            coro.close()
 
-        with local_runner_service._job_repo_factory() as job_repo:
-            job = job_repo.get_job(job_id)
-            assert job.state == State.ERROR
+            # Manually await the start_process logic to ensure the shell command finishes
+            await local_runner_service._start_process(job_id)
+            
+        complete_file = os.path.join(analysis_path, "Done.txt")
+        assert os.path.exists(complete_file)
+        os.remove(complete_file)
