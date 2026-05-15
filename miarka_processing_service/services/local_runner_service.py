@@ -186,8 +186,8 @@ class LocalRunnerService:
 
         if os.path.exists(filter_file):
             bash_cmd = {"command": ["rsync", "-avP",
-                                    "--exclude", "*",
                                     "--include-from", filter_file,
+                                    "--exclude", "*",
                                     os.path.join(source_path, ""),
                                     os.path.join(destination_path, "")]}
             print(bash_cmd)
