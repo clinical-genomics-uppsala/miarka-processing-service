@@ -4,6 +4,7 @@ import asyncio
 import mock
 import tempfile
 import os
+import shutil
 import time
 import signal
 
@@ -378,6 +379,9 @@ class TestLocalRunnerService(object):
                 print(os.path.join(destination_path, dir))
                 assert os.path.exists(os.path.join(destination_path, dir))
 
-            #for dir in expected_dirs:
-            #    os.remove(os.path.join(destination_path, dir))
-            #os.remove(os.path.join(source_path, "files_to_outbox.txt"))
+            for dir in expected_dirs:
+                if os.path.isdir(os.path.join(destination_path, dir)):
+                    shutil.rmtree(os.path.join(destination_path, dir))
+                elif os.path.isfile(os.path.join(destination_path, dir)):
+                    os.remove(os.path.join(destination_path, dir))
+            os.remove(os.path.join(source_path, "files_to_outbox.txt"))
