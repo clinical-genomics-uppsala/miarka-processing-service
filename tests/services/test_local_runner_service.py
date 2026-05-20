@@ -4,6 +4,7 @@ import asyncio
 import mock
 import tempfile
 import os
+import shutil
 import time
 import signal
 
@@ -277,3 +278,110 @@ class TestLocalRunnerService(object):
         complete_file = os.path.join(analysis_path, "Done.txt")
         assert os.path.exists(complete_file)
         os.remove(complete_file)
+
+    def test_sync_directory(self, job_repo_factory):
+        local_runner_service = LocalRunnerService(job_repo_factory)
+        source_path = "/path/to/source/directory/"
+        destination_path = "/path/to/destination/directory/"
+        filter = []
+        may_exist_filter = []
+
+        with mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop, \
+             mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists", side_effect=[True,True,False]):
+            job_id = local_runner_service.sync_directory(source_path=source_path,
+                                                         destination_path=destination_path,
+                                                         filter=filter,
+                                                         may_exist_filter=may_exist_filter)
+            
+            # Close coroutine to silence RunTime warning
+            mock_loop.return_value.create_task.call_args[0][0].close()
+            
+            with local_runner_service._job_repo_factory() as job_repo:
+                job = job_repo.get_job(job_id)
+                expected_cmd = ["rsync", "-avP", source_path, destination_path]
+            
+                assert job.command == expected_cmd
+                assert job.state == State.PENDING
+
+    def test_sync_directory_filter(self, job_repo_factory):
+        local_runner_service = LocalRunnerService(job_repo_factory)
+        source_path = "/path/to/source/directory/"
+        destination_path = "/path/to/destination/directory/"
+        filter = ["results", "bam_*"]
+        may_exist_filter = []
+
+        with mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop, \
+             mock.patch("miarka_processing_service.services.local_runner_service.open", mock.mock_open()) as m_open, \
+             mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists", return_value=True):
+            job_id = local_runner_service.sync_directory(source_path=source_path,
+                                                         destination_path=destination_path,
+                                                         filter=filter,
+                                                         may_exist_filter=may_exist_filter)
+            
+            # Close coroutine to silence RunTime warning
+            mock_loop.return_value.create_task.call_args[0][0].close()
+
+            # Verify that the filter file was opened and written to correctly
+            filter_file = os.path.join(source_path, "files_to_outbox.txt")
+            m_open.assert_called_once_with(filter_file, "a")
+            m_open().write.assert_called_once_with("\n".join(filter) + "\n")
+            
+            with local_runner_service._job_repo_factory() as job_repo:
+                job = job_repo.get_job(job_id)
+                expected_cmd = ["rsync", "-avP", "--include-from", filter_file, "--exclude", "*", source_path, destination_path]
+            
+                assert job.command == expected_cmd
+                assert job.state == State.PENDING
+
+    def test_sync_directory_missing_file(self, job_repo_factory):
+        "What will happen if a file specified in the filter does not exist?"
+        pass
+
+    def test_sync_directory_missing_outbox_directory(self, job_repo_factory):
+        """What will happen if the outbox directory does not exist?"""
+        pass
+
+    @pytest.mark.asyncio
+    async def test_sync_to_outbox(self, job_repo_factory):
+        local_runner_service = LocalRunnerService(job_repo_factory)
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        request_data = {"source_directory": os.path.join(project_root, "tests", "resources", "analysis", "DEF-456"),
+                        "destination_directory": os.path.join(project_root, "tests", "resources", "outbox", "DEF-456"),
+                        "filter": ["results/***", "bam_*/***", "*config.yaml"],
+                        "may_exist_filter": ["gvcf_*"]}
+        
+        # Simulate handler getting variables from request_data
+        source_path = request_data.get("source_directory", "")
+        destination_path = request_data.get("destination_directory", "")
+        filter = request_data.get("filter", [])
+        may_exist_filter = request_data.get("may_exist_filter", [])
+
+        with mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop:
+            job_id = local_runner_service.sync_directory(source_path=source_path,
+                                                         destination_path=destination_path,
+                                                         filter=filter,
+                                                         may_exist_filter=may_exist_filter)
+
+            # Capture and close the coroutine created inside start_runscript to prevent RuntimeWarning
+            coro = mock_loop.return_value.create_task.call_args[0][0]
+            coro.close()
+
+            # Manually await the start_process logic to ensure the shell command finishes
+            await local_runner_service._start_process(job_id)
+            
+            with local_runner_service._job_repo_factory() as job_repo:
+                job = job_repo.get_job(job_id)
+            assert job.state == State.DONE
+
+            expected_dirs = ["bam_dna", "results", "gvcf_dna", "analysis_config.yaml"]
+
+            for dir in expected_dirs:
+                print(os.path.join(destination_path, dir))
+                assert os.path.exists(os.path.join(destination_path, dir))
+
+            for dir in expected_dirs:
+                if os.path.isdir(os.path.join(destination_path, dir)):
+                    shutil.rmtree(os.path.join(destination_path, dir))
+                elif os.path.isfile(os.path.join(destination_path, dir)):
+                    os.remove(os.path.join(destination_path, dir))
+            os.remove(os.path.join(source_path, "files_to_outbox.txt"))

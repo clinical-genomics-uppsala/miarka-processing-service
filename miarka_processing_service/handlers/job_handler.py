@@ -251,3 +251,74 @@ class CreateDirectoryHandler(BaseRestHandler):
                 status_code=NOT_FOUND,
                 log_message=str(exc)
             ) from exc
+
+class SyncDirectoryHandler(BaseRestHandler):
+    "Class to handle rsync of directories between analysis-dir and outbox-dir on miarka."
+
+    def initialize(self, runner_service, **kwargs):
+        """
+        Initalize a new instance of JobStartHandler.
+        """
+        self.runner_service = runner_service
+
+    def post(self):
+        """
+        Posting to this endpoint will start a job for the provided runscript on
+        the provided runfolder, e.g.:
+        curl -X POST -w'\n' --data '{"source_directory": "<% ctx(analysis_folder_path) %>" \
+        "destination_directory": "<% ctx(outbox_folder_path) %>" \
+        "filter": "<% ctx(process_settings).get(ctx(workpackage)).get(ctx(analysis)).get('outbox_files_and_folders', []) %>"}' \
+        "may_exist_filter": <% ctx(process_settings).get(ctx(workpackage)).get(ctx(analysis)).get('outbox_files_and_folders_that_may_exist', []) %>" \
+        http://localhost:9999/api/1.0/jobs/sync_directory/
+        The endpoint will return a link where the run can be monitored:
+            {"link": "http://localhost:9999/api/1.0/jobs/130"}
+
+        sync_data_to_outbox:
+            with:
+                items: <% ctx(process_settings).get(ctx(workpackage)).get(ctx(analysis)).get('outbox_files_and_folders', []) %>
+                concurrency: 2
+            action: core.local
+            input:
+                cwd: <% ctx(analysis_folder_path) %>
+                cmd: cp -r <% item() %> <% ctx(outbox_folder) %>/
+
+        gms560:
+            run_script: "/projects/bin/pipeline_start_scripts/marvin/start_wp1_gms560.sh"
+            parameters: ""
+            outbox_files_and_folders:
+                - "results"
+                - "bam_*"
+                - "samples.tsv"
+                - "units.tsv"
+                - "samples_and_settings.json"
+            outbox_files_and_folders_that_may_exist:
+                - "gvcf_*"
+
+        This endpoint also support the following parameters:
+        TODO: 
+        """
+        try:
+            request_data = self.body_as_object()
+
+            job_id = self.runner_service.sync_directory(
+                    source_path=request_data.get("source_directory", ""),
+                    destination_path=request_data.get("destination_directory", ""),
+                    filter=request_data.get("filter", []),
+                    may_exist_filter=request_data.get("may_exist_filter", [])
+                    )
+
+            self.set_status(status_code=ACCEPTED)
+            self.write_object(
+                {
+                    "link":
+                        f"{self.request.protocol}://"
+                        f"{self.request.host}"
+                        f"{self.reverse_url('one_job', job_id)}",
+                    'version': version,
+                }
+            )
+        except (RunfolderNotFound, FileNotFoundError) as exc:
+            raise HTTPError(
+                status_code=NOT_FOUND,
+                log_message=str(exc)
+            ) from exc
