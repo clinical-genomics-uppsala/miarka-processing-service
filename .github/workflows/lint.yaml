@@ -1,0 +1,50 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Lint
+
+# Controls when the action will run. 
+on:
+  # Triggers the workflow on push or pull request events but only for the dev branch
+  push:
+    branches: 
+     - main
+     - dev
+  pull_request:
+    branches: 
+     - main
+     - dev
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  health-check-job: # health check job for testing and code formatting check
+    runs-on: ubuntu-latest # os for running the job
+    strategy:
+      matrix:
+        python-version: [ "3.10", "3.11", "3.12", "3.13" ]
+    steps:
+      - name: Checkout code # checking our the code at current commit that triggers the workflow
+        uses: actions/checkout@v6
+      - name: Cache dependency # caching dependency will make our build faster.
+        uses: actions/cache@v5 # for more info checkout pip section documentation at https://github.com/actions/cache
+        with:
+          path: ~/.cache/pip
+          key: runner.os -pip-{{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+            python-version: ${{ matrix.python-version }}
+      - name: Check Python version # checking the python version to see if 3.x is installed.
+        run: python --version
+      - name: Install requirements # install application requirements
+        run: pip install .[dev]
+      - name: Install pycodestyle and flake8
+        run: pip install pycodestyle flake8
+      - name: Check Syntax # check code formatting
+        run: pycodestyle --max-line-length=130 --statistics .
+      - name: flask8 # check code formatting
+        run: flake8 --ignore=E501,F401,W504 .
