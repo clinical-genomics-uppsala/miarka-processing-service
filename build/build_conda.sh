@@ -16,15 +16,7 @@ cd ${SERVICE_NAME}
 mamba create --prefix ./${SERVICE_NAME}_env python=${PYTHON_VERSION} -y
 conda activate ./${SERVICE_NAME}_env
 
-# if [ -d ${SERVICE_NAME}_${TAG_OR_BRANCH} ];
-# then
-#     rm -fr ${SERVICE_NAME}_${TAG_OR_BRANCH}
-# fi
-
-# mkdir ${SERVICE_NAME}_${TAG_OR_BRANCH}
-# clone the required version of the pipeline
-#git clone --branch ${TAG_OR_BRANCH} ${SERVICE_GITHUB_REPO} ${SERVICE_NAME}_${TAG_OR_BRANCH}/${SERVICE_NAME}
-# install the requirements for the pipeline
+# install the service and the requirements needed in production
 ./${SERVICE_NAME}_env/bin/pip3 install -I . 
 # pack the environment with the requriements installed
 conda pack --prefix ./${SERVICE_NAME}_env -o env.tar.gz

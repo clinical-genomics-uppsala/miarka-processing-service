@@ -111,7 +111,7 @@ class LocalRunnerService:
 
     def create_directory(self, path):
         with self._job_repo_factory() as job_repo:
-            bash_cmd = {"command": ["mkdir",path]}
+            bash_cmd = {"command": ["mkdir", "-p", path]}
             job_id = job_repo.add_job(command_in=bash_cmd).job_id
 
         log.debug("calling start_process with id %s" % str(job_id))
