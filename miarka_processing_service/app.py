@@ -17,7 +17,7 @@ from alembic.config import Config as AlembicConfig
 from alembic.command import upgrade as upgrade_db
 
 from miarka_processing_service.handlers.version_handler import VersionHandler
-from miarka_processing_service.handlers.job_handler import OneJobHandler, ManyJobHandler,\
+from miarka_processing_service.handlers.job_handler import OneJobHandler, ManyJobHandler, \
     JobStopHandler, JobStartAnalysisHandler, CreateDirectoryHandler, SyncDirectoryHandler
 from miarka_processing_service.services.local_runner_service import LocalRunnerService
 from miarka_processing_service.repositiories.job_repo import JobRepository
