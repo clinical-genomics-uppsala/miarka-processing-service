@@ -186,21 +186,21 @@ class JobStartAnalysisHandler(BaseRestHandler):
             {"link": "http://localhost:9999/api/1.0/jobs/130"}
 
         This endpoint also support the following parameters:
-        TODO: 
+        TODO:
         """
         try:
             request_data = self.body_as_object()
 
-            params=request_data.get("parameters", "")
+            params = request_data.get("parameters", "")
 
             if params != "":
-                params=request_data.get("parameters").split(" ")
+                params = request_data.get("parameters").split(" ")
 
             job_id = self.runner_service.start_runscript(
-                    analysis_path=request_data.get("analysis_path", ""),
-                    runscript=request_data.get("runscript", ""),
-                    inbox_path=request_data.get("inbox_path", ""),
-                    pipeline_params=params)
+                analysis_path=request_data.get("analysis_path", ""),
+                runscript=request_data.get("runscript", ""),
+                inbox_path=request_data.get("inbox_path", ""),
+                pipeline_params=params)
             self.set_status(status_code=ACCEPTED)
             self.write_object(
                 {
@@ -228,7 +228,7 @@ class CreateDirectoryHandler(BaseRestHandler):
         self.runner_service = runner_service
 
     def post(self):
-        """   
+        """
         curl -X POST -w '\n' --data '{"path": "<% ctx(analysis_folder_path) %>" }' \
         http://localhost:11010/api/1.0/jobs/create_directory/
         """
@@ -252,6 +252,7 @@ class CreateDirectoryHandler(BaseRestHandler):
                 log_message=str(exc)
             ) from exc
 
+
 class SyncDirectoryHandler(BaseRestHandler):
     "Class to handle rsync of directories between analysis-dir and outbox-dir on miarka."
 
@@ -268,7 +269,8 @@ class SyncDirectoryHandler(BaseRestHandler):
         curl -X POST -w'\n' --data '{"source_directory": "<% ctx(analysis_folder_path) %>" \
         "destination_directory": "<% ctx(outbox_folder_path) %>" \
         "filter": "<% ctx(process_settings).get(ctx(workpackage)).get(ctx(analysis)).get('outbox_files_and_folders', []) %>"}' \
-        "may_exist_filter": <% ctx(process_settings).get(ctx(workpackage)).get(ctx(analysis)).get('outbox_files_and_folders_that_may_exist', []) %>" \
+        "may_exist_filter": <% ctx(process_settings).get(ctx(workpackage)).get(ctx(analysis)) \
+        .get('outbox_files_and_folders_that_may_exist', []) %>" \
         http://localhost:9999/api/1.0/jobs/sync_directory/
         The endpoint will return a link where the run can be monitored:
             {"link": "http://localhost:9999/api/1.0/jobs/130"}
@@ -295,17 +297,17 @@ class SyncDirectoryHandler(BaseRestHandler):
                 - "gvcf_*"
 
         This endpoint also support the following parameters:
-        TODO: 
+        TODO:
         """
         try:
             request_data = self.body_as_object()
 
             job_id = self.runner_service.sync_directory(
-                    source_path=request_data.get("source_directory", ""),
-                    destination_path=request_data.get("destination_directory", ""),
-                    filter=request_data.get("filter", []),
-                    may_exist_filter=request_data.get("may_exist_filter", [])
-                    )
+                source_path=request_data.get("source_directory", ""),
+                destination_path=request_data.get("destination_directory", ""),
+                filter=request_data.get("filter", []),
+                may_exist_filter=request_data.get("may_exist_filter", [])
+            )
 
             self.set_status(status_code=ACCEPTED)
             self.write_object(

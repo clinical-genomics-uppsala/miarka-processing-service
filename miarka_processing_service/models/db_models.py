@@ -11,7 +11,7 @@ import enum as base_enum
 import json
 
 from sqlalchemy import Column, Integer, String, Enum, DateTime, Text
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
 from arteria.web.state import State as ArteriaState

@@ -10,7 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 from tornado.web import URLSpec as url
-#from tornado.ioloop import PeriodicCallback
 
 from arteria.web.app import AppService
 
@@ -18,7 +17,7 @@ from alembic.config import Config as AlembicConfig
 from alembic.command import upgrade as upgrade_db
 
 from miarka_processing_service.handlers.version_handler import VersionHandler
-from miarka_processing_service.handlers.job_handler import OneJobHandler, ManyJobHandler,\
+from miarka_processing_service.handlers.job_handler import OneJobHandler, ManyJobHandler, \
     JobStopHandler, JobStartAnalysisHandler, CreateDirectoryHandler, SyncDirectoryHandler
 from miarka_processing_service.services.local_runner_service import LocalRunnerService
 from miarka_processing_service.repositiories.job_repo import JobRepository
@@ -110,7 +109,7 @@ def configure_routes(config):
     job_repo_factory = functools.partial(JobRepository, session_factory=session_factory)
     local_runner_service = LocalRunnerService(
         job_repo_factory
-        )
+    )
 
     monitored_dirs = get_key_from_config(config, 'monitored_directories')
     runfolder_repo = RunfolderRepository(monitored_dirs)
