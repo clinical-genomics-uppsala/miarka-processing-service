@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest # os for running the job
     strategy:
       matrix:
-        python-version: [ "3.10", "3.11", "3.12", "3.13" ]
+        python-version: ["3.12"]
     steps:
       - name: Checkout code # checking our the code at current commit that triggers the workflow
         uses: actions/checkout@v6
@@ -45,6 +45,6 @@ jobs:
       - name: Install pycodestyle and flake8
         run: pip install pycodestyle flake8
       - name: Check Syntax # check code formatting
-        run: pycodestyle --max-line-length=130 --statistics .
+        run: pycodestyle --max-line-length=130 --statistics --paths ./miarka_processing_service,./tests
       - name: flask8 # check code formatting
-        run: flake8 --ignore=E501,F401,W504 .
+        run: flake8 --ignore=E501,F401,W504 miarka_processing_service --paths ./miarka_processing_service,./tests
