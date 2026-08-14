@@ -10,7 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 from tornado.web import URLSpec as url
-#from tornado.ioloop import PeriodicCallback
 
 from arteria.web.app import AppService
 
@@ -110,7 +109,7 @@ def configure_routes(config):
     job_repo_factory = functools.partial(JobRepository, session_factory=session_factory)
     local_runner_service = LocalRunnerService(
         job_repo_factory
-        )
+    )
 
     monitored_dirs = get_key_from_config(config, 'monitored_directories')
     runfolder_repo = RunfolderRepository(monitored_dirs)

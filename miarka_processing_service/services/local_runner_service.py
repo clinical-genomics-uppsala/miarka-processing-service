@@ -41,7 +41,6 @@ class LocalRunnerService:
         """
         self._job_repo_factory = job_repo_factory
 
-
     async def _start_process(self, job_id):
         log.debug(f"Attempting to start process for job_id: {job_id}")
         with self._job_repo_factory() as job_repo:
@@ -86,9 +85,11 @@ class LocalRunnerService:
                     log.info("Successfully completed process: %s", job.command)
                     job_repo.set_state_of_job(job_id=job.job_id, state=State.DONE, cmd_log=cmd_log)
                     log.debug(f"Job {job_id} state set to DONE.")
-                else: # Process failed
-                    log.error(f"Process for job {job_id} failed with return code {process.returncode}. Check job log for details.")
-                    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd_to_execute) # Raise with the command that was executed
+                else:  # Process failed
+                    log.error(f"Process for job {job_id} failed with return code {process.returncode}. "
+                              "Check job log for details.")
+                    # Raise with the command that was executed
+                    raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd_to_execute)
 
             except subprocess.CalledProcessError as e:
                 job = job_repo.get_job(job_id)
@@ -101,13 +102,12 @@ class LocalRunnerService:
                     job_id=job_id,
                     state=State.ERROR,
                     cmd_log=cmd_log if 'cmd_log' in locals() else f"Process failed to start or communicate. Error: {e}"
-                    )
+                )
                 log.debug(f"Job {job_id} state set to ERROR.")
-            except Exception as e: # Catch any other unexpected exceptions
+            except Exception as e:  # Catch any other unexpected exceptions
                 log.exception(f"An unexpected error occurred while processing job {job_id}: {e}")
                 job_repo.set_state_of_job(job_id=job_id, state=State.ERROR, cmd_log=f"An unexpected error occurred: {e}")
                 log.debug(f"Job {job_id} state set to ERROR due to unexpected exception.")
-
 
     def create_directory(self, path):
         with self._job_repo_factory() as job_repo:
@@ -119,7 +119,6 @@ class LocalRunnerService:
         loop.create_task(self._start_process(job_id))
 
         return job_id
-
 
     def start_runscript(
         self,
@@ -162,7 +161,7 @@ class LocalRunnerService:
         loop.create_task(self._start_process(job_id))
         return job_id
 
-    def sync_directory(self, 
+    def sync_directory(self,
                        *,
                        source_path,
                        destination_path,

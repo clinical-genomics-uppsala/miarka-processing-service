@@ -4,7 +4,7 @@ This module contains repository classes related to managing job objects.
 
 import logging
 
-#from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+# from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
 from miarka_processing_service.models.db_models import Job, State
 
