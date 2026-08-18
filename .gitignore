@@ -7,6 +7,9 @@ docs/routes.rst
 # Ignore default database
 miarka_processing.db
 
+# Local service log (dev-environment)
+miarka-processing-service.log.*
+
 # PyCharm
 .idea/
 
