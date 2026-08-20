@@ -1,46 +1,33 @@
 # pylint: disable=W0107
 # Intentionally disabling unnecessary-pass to allow for otherwise empty exception classes.
 """
-Custom exceptions for sequencing-report-service.
+Custom exceptions for miarka-processing-service.
 """
 
 
-class SequencingReportBaseException(Exception):
+class ProcessingBaseException(Exception):
     """
-    Base exception class for sequencing-report-service.
+    Base exception class for miarka-processing-service.
     """
     pass
 
 
-class ConfigurationError(SequencingReportBaseException):
+class ConfigurationError(ProcessingBaseException):
     """
     Exception in case required configuration key cannot be retrieved.
     """
     pass
 
 
-class RunfolderNotFound(SequencingReportBaseException):
-    """
-    Exception in case specified runfolder does not exist.
-    """
-    pass
-
-
-class UnableToStopJob(SequencingReportBaseException):
+class UnableToStopJob(ProcessingBaseException):
     """
     Exception in case job cannot be stopped because it does not exist on a cancellable state.
     """
     pass
 
 
-class NextflowConfigError(ConfigurationError):
-    """
-    Exception thrown when there is a problem with the configuration of the nextflow job.
-    """
-    pass
-
-
-class CreateDirectoryError(Exception):
+class CreateDirectoryError(ProcessingBaseException):
     """
     Exception thrown when there is a problem with creating a directory on miarka.
     """
+    pass

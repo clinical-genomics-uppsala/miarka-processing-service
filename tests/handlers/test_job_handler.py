@@ -10,7 +10,6 @@ import mock
 
 from miarka_processing_service.app import routes
 from miarka_processing_service.services.local_runner_service import LocalRunnerService
-from miarka_processing_service.repositiories.runfolder_repo import RunfolderRepository
 from miarka_processing_service.models.db_models import Job, State
 import importlib.metadata
 
@@ -29,11 +28,7 @@ class TestJobHandler(AsyncHTTPTestCase):
         mock_runner_service.sync_directory = mock.MagicMock(return_value=job.job_id)
         mock_runner_service.stop = mock.MagicMock(return_value=job)
 
-        mock_runfolder_repo = mock.create_autospec(RunfolderRepository)
-        mock_runfolder_repo.get_runfolder = mock.MagicMock(return_value=mock)
-
-        return Application(routes(runner_service=mock_runner_service,
-                                  runfolder_repo=mock_runfolder_repo))
+        return Application(routes(runner_service=mock_runner_service))
 
     def test_get_jobs(self):
         response = self.fetch('/api/1.0/jobs/')

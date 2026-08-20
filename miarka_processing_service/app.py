@@ -21,7 +21,6 @@ from miarka_processing_service.handlers.job_handler import OneJobHandler, ManyJo
     JobStopHandler, JobStartAnalysisHandler, CreateDirectoryHandler, SyncDirectoryHandler
 from miarka_processing_service.services.local_runner_service import LocalRunnerService
 from miarka_processing_service.repositiories.job_repo import JobRepository
-from miarka_processing_service.repositiories.runfolder_repo import RunfolderRepository
 from miarka_processing_service.exceptions import ConfigurationError
 
 log = logging.getLogger(__name__)
@@ -107,19 +106,12 @@ def configure_routes(config):
     session_factory.configure(bind=engine)
 
     job_repo_factory = functools.partial(JobRepository, session_factory=session_factory)
-    local_runner_service = LocalRunnerService(
-        job_repo_factory
-    )
-
-    monitored_dirs = get_key_from_config(config, 'monitored_directories')
-    runfolder_repo = RunfolderRepository(monitored_dirs)
+    local_runner_service = LocalRunnerService(job_repo_factory)
 
     with job_repo_factory() as job_repo:
         job_repo.clear_out_stale_jobs_at_startup()
 
-    return routes(config=config,
-                  runner_service=local_runner_service,
-                  runfolder_repo=runfolder_repo)
+    return routes(config=config, runner_service=local_runner_service)
 
 
 def start(package=__package__):

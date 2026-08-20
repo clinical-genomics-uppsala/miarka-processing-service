@@ -1,5 +1,5 @@
 """
-Handlers for the sequencing_report_service
+Handlers for miarka-processing-service
 """
 
 # Status codes

@@ -1,7 +1,7 @@
 # pylint: disable=W0223,W0221,W0511,W0201
 # W0201 needs to be disabled because this is the way that tornado demands that handlers
 #       are setup
-# TODO: remove these exceptions, see DEVELOP-440
+# TODO: remove these exceptions
 """
 Handlers start, stop and check jobs.
 """
@@ -11,7 +11,7 @@ from tornado.web import HTTPError
 from arteria.web.handlers import BaseRestHandler
 
 from miarka_processing_service.handlers import ACCEPTED, NOT_FOUND, FORBIDDEN
-from miarka_processing_service.exceptions import UnableToStopJob, RunfolderNotFound
+from miarka_processing_service.exceptions import UnableToStopJob
 from miarka_processing_service import __version__ as version
 
 
@@ -32,8 +32,8 @@ class OneJobHandler(BaseRestHandler):
         return or the form:
         {
             "job_id": 1,
-            "command": "nextflow run socks --style emoji",
-            "environment": "NXF_TEMP=/tmp",
+            "command": "bash /script/to/exec.sh",
+            "environment": "",
             "pid": 3837,
             "state": "done",
             "created": "2018-11-27 12:06:26",
@@ -70,8 +70,8 @@ class ManyJobHandler(BaseRestHandler):
         "jobs": [
             {
                 "job_id": 1,
-                "command": "nextflow run socks --style emoji",
-                "environment": "NXF_TEMP=/tmp",
+                "command": "bash /script/to/exec.sh",
+                "environment": "",
                 "pid": 3837,
                 "state": "done",
                 "created": "2018-11-27 12:06:26",
@@ -80,8 +80,8 @@ class ManyJobHandler(BaseRestHandler):
             },
             {
                 "job_id": 2,
-                "command": "nextflow run socks --style ascii",
-                "environment": "NXF_TEMP=/tmp",
+                "command": "mkdir -p /dir/to/create",
+                "environment": "",
                 "pid": 4394,
                 "state": "done",
                 "created": "2018-11-27 12:09:59",
@@ -145,11 +145,6 @@ class JobStartAnalysisHandler(BaseRestHandler):
         The endpoint will then return a link where the run can be monitored:
             {"link": "http://localhost:9999/api/1.0/jobs/130"}
 
-        This endpoint also support the following parameters:
-            - `input_samplesheet_content`: content of the nf-core input samplesheet to
-            input to the pipeline
-            - `ext_args`: extra arguments to pass to the pipeline
-
     TODO:
     Information from workflow variables that has to be sent to processing-service
     to be able to start an analysis.
@@ -211,7 +206,7 @@ class JobStartAnalysisHandler(BaseRestHandler):
                     'version': version,
                 }
             )
-        except (RunfolderNotFound, FileNotFoundError) as exc:
+        except (Exception) as exc:
             raise HTTPError(
                 status_code=NOT_FOUND,
                 log_message=str(exc)
@@ -319,7 +314,7 @@ class SyncDirectoryHandler(BaseRestHandler):
                     'version': version,
                 }
             )
-        except (RunfolderNotFound, FileNotFoundError) as exc:
+        except (Exception) as exc:
             raise HTTPError(
                 status_code=NOT_FOUND,
                 log_message=str(exc)
