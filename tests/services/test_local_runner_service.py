@@ -5,7 +5,6 @@ import mock
 import tempfile
 import os
 import shutil
-import time
 import signal
 
 import pytest
@@ -334,20 +333,85 @@ class TestLocalRunnerService(object):
                 assert job.command == expected_cmd
                 assert job.state == State.PENDING
 
-    def test_sync_directory_missing_file(self, job_repo_factory):
-        "What will happen if a file specified in the filter does not exist?"
-        pass
-
-    def test_sync_directory_missing_outbox_directory(self, job_repo_factory):
-        """What will happen if the outbox directory does not exist?"""
-        pass
+    @pytest.fixture
+    def outbox_paths(self):
+        """Real analysis/outbox resource dirs, cleaned up even if the test fails."""
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        source_path = os.path.join(project_root, "tests", "resources", "analysis", "DEF-456")
+        destination_path = os.path.join(project_root, "tests", "resources", "outbox", "DEF-456")
+        os.makedirs(destination_path, exist_ok=True)
+        try:
+            yield source_path, destination_path
+        finally:
+            for entry in os.listdir(destination_path):
+                if entry == ".keep":
+                    continue
+                entry_path = os.path.join(destination_path, entry)
+                if os.path.isdir(entry_path):
+                    shutil.rmtree(entry_path)
+                else:
+                    os.remove(entry_path)
+            filter_file = os.path.join(source_path, "files_to_outbox.txt")
+            if os.path.exists(filter_file):
+                os.remove(filter_file)
 
     @pytest.mark.asyncio
-    async def test_sync_to_outbox(self, job_repo_factory):
+    async def test_sync_directory_missing_file(self, job_repo_factory, outbox_paths):
+        """A filter pattern that matches nothing is skipped by rsync; the job still succeeds."""
+        source_path, destination_path = outbox_paths
         local_runner_service = LocalRunnerService(job_repo_factory)
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        request_data = {"source_directory": os.path.join(project_root, "tests", "resources", "analysis", "DEF-456"),
-                        "destination_directory": os.path.join(project_root, "tests", "resources", "outbox", "DEF-456"),
+
+        with mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop:
+            job_id = local_runner_service.sync_directory(
+                source_path=source_path,
+                destination_path=destination_path,
+                filter=["results/***", "no_such_dir/***", "no_such_config.yaml"],
+                may_exist_filter=["no_such_gvcf_*"])
+
+            # Close coroutine to silence RunTime warning
+            mock_loop.return_value.create_task.call_args[0][0].close()
+
+            # Manually await the start_process logic to ensure the shell command finishes
+            await local_runner_service._start_process(job_id)
+
+        with local_runner_service._job_repo_factory() as job_repo:
+            job = job_repo.get_job(job_id)
+        assert job.state == State.DONE
+
+        # Requested and present in the source -> transferred
+        assert os.path.exists(os.path.join(destination_path, "results"))
+        # Requested but absent from the source -> silently skipped, not an error
+        assert not os.path.exists(os.path.join(destination_path, "no_such_dir"))
+        assert not os.path.exists(os.path.join(destination_path, "no_such_config.yaml"))
+        # Not requested -> not transferred
+        assert not os.path.exists(os.path.join(destination_path, "bam_dna"))
+
+        # may_exist_filter patterns matching nothing are never written to the filter file
+        with open(os.path.join(source_path, "files_to_outbox.txt")) as f:
+            assert "no_such_gvcf_*" not in f.read()
+
+    def test_sync_directory_missing_outbox_directory(self, job_repo_factory, outbox_paths):
+        """A missing destination fails fast: no job queued and no filter file left behind."""
+        source_path, destination_path = outbox_paths
+        local_runner_service = LocalRunnerService(job_repo_factory)
+
+        with pytest.raises(FileNotFoundError):
+            local_runner_service.sync_directory(
+                source_path=source_path,
+                destination_path=os.path.join(destination_path, "does_not_exist"),
+                filter=["results/***"],
+                may_exist_filter=[])
+
+        assert not os.path.exists(os.path.join(source_path, "files_to_outbox.txt"))
+        with local_runner_service._job_repo_factory() as job_repo:
+            assert job_repo.get_jobs() == []
+
+    @pytest.mark.asyncio
+    async def test_sync_to_outbox(self, job_repo_factory, outbox_paths):
+        local_runner_service = LocalRunnerService(job_repo_factory)
+        analysis_dir, outbox_dir = outbox_paths
+        request_data = {"source_directory": analysis_dir,
+                        "destination_directory": outbox_dir,
                         "filter": ["results/***", "bam_*/***", "*config.yaml"],
                         "may_exist_filter": ["gvcf_*"]}
 
@@ -379,10 +443,3 @@ class TestLocalRunnerService(object):
             for dir in expected_dirs:
                 print(os.path.join(destination_path, dir))
                 assert os.path.exists(os.path.join(destination_path, dir))
-
-            for dir in expected_dirs:
-                if os.path.isdir(os.path.join(destination_path, dir)):
-                    shutil.rmtree(os.path.join(destination_path, dir))
-                elif os.path.isfile(os.path.join(destination_path, dir)):
-                    os.remove(os.path.join(destination_path, dir))
-            os.remove(os.path.join(source_path, "files_to_outbox.txt"))

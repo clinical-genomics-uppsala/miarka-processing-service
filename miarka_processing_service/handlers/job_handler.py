@@ -1,18 +1,47 @@
 # pylint: disable=W0223,W0221,W0511,W0201
 # W0201 needs to be disabled because this is the way that tornado demands that handlers
 #       are setup
-# TODO: remove these exceptions, see DEVELOP-440
+# TODO: remove these exceptions
 """
 Handlers start, stop and check jobs.
 """
+
+import os
 
 from tornado.web import HTTPError
 
 from arteria.web.handlers import BaseRestHandler
 
-from miarka_processing_service.handlers import ACCEPTED, NOT_FOUND, FORBIDDEN
-from miarka_processing_service.exceptions import UnableToStopJob, RunfolderNotFound
+from miarka_processing_service.handlers import ACCEPTED, BAD_REQUEST, NOT_FOUND, FORBIDDEN
+from miarka_processing_service.exceptions import UnableToStopJob
 from miarka_processing_service import __version__ as version
+
+
+def _parse_request_body(handler):
+    """
+    Return the JSON body of the request as an object, or raise a 400 if it cannot be parsed.
+
+    arteria's body_as_object() lets json.JSONDecodeError (a ValueError) escape, which would
+    otherwise surface as a 500 for what is a malformed request.
+    """
+    try:
+        return handler.body_as_object()
+    except ValueError as exc:
+        raise HTTPError(BAD_REQUEST, "request body is not valid JSON: %s", str(exc)) from exc
+
+
+def _required_string(request_data, field):
+    """
+    Return a required, non-empty string field from the request body, or raise a 400.
+
+    Note that arteria's body_as_object(required_members=...) cannot be used for this: it
+    raises HTTPError with the status code as a string, which makes tornado fail to write
+    any response at all.
+    """
+    value = request_data.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise HTTPError(BAD_REQUEST, 'missing or empty required field "%s"', field)
+    return value
 
 
 class OneJobHandler(BaseRestHandler):
@@ -32,8 +61,8 @@ class OneJobHandler(BaseRestHandler):
         return or the form:
         {
             "job_id": 1,
-            "command": "nextflow run socks --style emoji",
-            "environment": "NXF_TEMP=/tmp",
+            "command": "bash /script/to/exec.sh",
+            "environment": "",
             "pid": 3837,
             "state": "done",
             "created": "2018-11-27 12:06:26",
@@ -70,8 +99,8 @@ class ManyJobHandler(BaseRestHandler):
         "jobs": [
             {
                 "job_id": 1,
-                "command": "nextflow run socks --style emoji",
-                "environment": "NXF_TEMP=/tmp",
+                "command": "bash /script/to/exec.sh",
+                "environment": "",
                 "pid": 3837,
                 "state": "done",
                 "created": "2018-11-27 12:06:26",
@@ -80,8 +109,8 @@ class ManyJobHandler(BaseRestHandler):
             },
             {
                 "job_id": 2,
-                "command": "nextflow run socks --style ascii",
-                "environment": "NXF_TEMP=/tmp",
+                "command": "mkdir -p /dir/to/create",
+                "environment": "",
                 "pid": 4394,
                 "state": "done",
                 "created": "2018-11-27 12:09:59",
@@ -145,11 +174,6 @@ class JobStartAnalysisHandler(BaseRestHandler):
         The endpoint will then return a link where the run can be monitored:
             {"link": "http://localhost:9999/api/1.0/jobs/130"}
 
-        This endpoint also support the following parameters:
-            - `input_samplesheet_content`: content of the nf-core input samplesheet to
-            input to the pipeline
-            - `ext_args`: extra arguments to pass to the pipeline
-
     TODO:
     Information from workflow variables that has to be sent to processing-service
     to be able to start an analysis.
@@ -188,34 +212,39 @@ class JobStartAnalysisHandler(BaseRestHandler):
         This endpoint also support the following parameters:
         TODO:
         """
+        request_data = _parse_request_body(self)
+
+        analysis_path = _required_string(request_data, "analysis_path")
+        runscript = _required_string(request_data, "runscript")
+        inbox_path = _required_string(request_data, "inbox_path")
+
+        params = request_data.get("parameters", "")
+        if isinstance(params, str):
+            # split() rather than split(" "), so that a stray leading, trailing or doubled
+            # space does not turn into an empty argument on the pipeline command line
+            params = params.split()
+        elif not isinstance(params, list):
+            raise HTTPError(BAD_REQUEST, 'field "parameters" must be a string or a list')
+
         try:
-            request_data = self.body_as_object()
-
-            params = request_data.get("parameters", "")
-
-            if params != "":
-                params = request_data.get("parameters").split(" ")
-
             job_id = self.runner_service.start_runscript(
-                analysis_path=request_data.get("analysis_path", ""),
-                runscript=request_data.get("runscript", ""),
-                inbox_path=request_data.get("inbox_path", ""),
+                analysis_path=analysis_path,
+                runscript=runscript,
+                inbox_path=inbox_path,
                 pipeline_params=params)
-            self.set_status(status_code=ACCEPTED)
-            self.write_object(
-                {
-                    "link":
-                        f"{self.request.protocol}://"
-                        f"{self.request.host}"
-                        f"{self.reverse_url('one_job', job_id)}",
-                    'version': version,
-                }
-            )
-        except (RunfolderNotFound, FileNotFoundError) as exc:
-            raise HTTPError(
-                status_code=NOT_FOUND,
-                log_message=str(exc)
-            ) from exc
+        except FileNotFoundError as exc:
+            raise HTTPError(NOT_FOUND, "%s", str(exc)) from exc
+
+        self.set_status(status_code=ACCEPTED)
+        self.write_object(
+            {
+                "link":
+                    f"{self.request.protocol}://"
+                    f"{self.request.host}"
+                    f"{self.reverse_url('one_job', job_id)}",
+                'version': version,
+            }
+        )
 
 
 class CreateDirectoryHandler(BaseRestHandler):
@@ -232,25 +261,27 @@ class CreateDirectoryHandler(BaseRestHandler):
         curl -X POST -w '\n' --data '{"path": "<% ctx(analysis_folder_path) %>" }' \
         http://localhost:11010/api/1.0/jobs/create_directory/
         """
-        try:
-            request_data = self.body_as_object()
-            job_id = self.runner_service.create_directory(path=request_data.get("path", ""))
-            self.set_status(status_code=ACCEPTED)
-            self.write_object(
-                {
-                    "link":
-                        f"{self.request.protocol}://"
-                        f"{self.request.host}"
-                        f"{self.reverse_url('one_job', job_id)}",
-                    'version': version,
-                }
-            )
+        request_data = _parse_request_body(self)
 
-        except (Exception) as exc:
-            raise HTTPError(
-                status_code=NOT_FOUND,
-                log_message=str(exc)
-            ) from exc
+        path = _required_string(request_data, "path")
+        if not os.path.isabs(path):
+            # A relative path would be created relative to the service's working directory
+            raise HTTPError(BAD_REQUEST, 'field "path" must be an absolute path, got: %s', path)
+
+        # create_directory only queues the job; a failing mkdir is reported through the
+        # job's state and log, not as an exception here.
+        job_id = self.runner_service.create_directory(path=path)
+
+        self.set_status(status_code=ACCEPTED)
+        self.write_object(
+            {
+                "link":
+                    f"{self.request.protocol}://"
+                    f"{self.request.host}"
+                    f"{self.reverse_url('one_job', job_id)}",
+                'version': version,
+            }
+        )
 
 
 class SyncDirectoryHandler(BaseRestHandler):
@@ -299,28 +330,34 @@ class SyncDirectoryHandler(BaseRestHandler):
         This endpoint also support the following parameters:
         TODO:
         """
-        try:
-            request_data = self.body_as_object()
+        request_data = _parse_request_body(self)
 
+        source_path = _required_string(request_data, "source_directory")
+        destination_path = _required_string(request_data, "destination_directory")
+
+        for field in ("filter", "may_exist_filter"):
+            # A string here would be iterated character by character when building the
+            # rsync filter file, which silently produces a nonsensical filter.
+            if not isinstance(request_data.get(field, []), list):
+                raise HTTPError(BAD_REQUEST, 'field "%s" must be a list', field)
+
+        try:
             job_id = self.runner_service.sync_directory(
-                source_path=request_data.get("source_directory", ""),
-                destination_path=request_data.get("destination_directory", ""),
+                source_path=source_path,
+                destination_path=destination_path,
                 filter=request_data.get("filter", []),
                 may_exist_filter=request_data.get("may_exist_filter", [])
             )
+        except FileNotFoundError as exc:
+            raise HTTPError(NOT_FOUND, "%s", str(exc)) from exc
 
-            self.set_status(status_code=ACCEPTED)
-            self.write_object(
-                {
-                    "link":
-                        f"{self.request.protocol}://"
-                        f"{self.request.host}"
-                        f"{self.reverse_url('one_job', job_id)}",
-                    'version': version,
-                }
-            )
-        except (RunfolderNotFound, FileNotFoundError) as exc:
-            raise HTTPError(
-                status_code=NOT_FOUND,
-                log_message=str(exc)
-            ) from exc
+        self.set_status(status_code=ACCEPTED)
+        self.write_object(
+            {
+                "link":
+                    f"{self.request.protocol}://"
+                    f"{self.request.host}"
+                    f"{self.reverse_url('one_job', job_id)}",
+                'version': version,
+            }
+        )

@@ -1,5 +1,5 @@
 """
-Handlers for the sequencing_report_service
+Handlers for miarka-processing-service
 """
 
 # Status codes
@@ -7,6 +7,7 @@ OK = 200
 ACCEPTED = 202
 NO_CONTENT = 204
 
+BAD_REQUEST = 400
 FORBIDDEN = 403
 NOT_FOUND = 404
 INTERNAL_SERVER_ERROR = 500
