@@ -24,10 +24,3 @@ class UnableToStopJob(ProcessingBaseException):
     Exception in case job cannot be stopped because it does not exist on a cancellable state.
     """
     pass
-
-
-class CreateDirectoryError(ProcessingBaseException):
-    """
-    Exception thrown when there is a problem with creating a directory on miarka.
-    """
-    pass
