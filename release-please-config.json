@@ -4,7 +4,7 @@
   "release-type": "python",
   "packages": {
     ".": {
-      "package-name": "miarka-processing-service",
+      "package-name": "miarka-processing-service"
     }
   }
 }
