@@ -4,7 +4,7 @@ This module contains repository classes related to managing job objects.
 
 import logging
 
-#from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+# from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
 from miarka_processing_service.models.db_models import Job, State
 
@@ -105,7 +105,7 @@ class JobRepository:
         """
         Set the state of the of the specified job to the specified state
         :param job_id: of Job to change
-        :param state: Instance of sequencing_report_models.db_models.State
+        :param state: Instance of miarka_processing_service.db_models.State
         :param cmd_log: Optionally add log for the job
         :return: The job which state was changed, or none if no (or multiple) jobs with id were found.
         """

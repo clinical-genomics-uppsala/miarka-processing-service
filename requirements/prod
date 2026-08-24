@@ -1,7 +1,0 @@
-
-wheel==0.37.1
-arteria==1.1.4
-sqlalchemy==1.4.41
-alembic==1.8.1
-jsonschema==4.19
-tornado==6.4.2

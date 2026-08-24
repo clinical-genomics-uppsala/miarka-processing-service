@@ -8,8 +8,8 @@ After cloning the repository, do the following to setup the conda environment.
 ```
 conda create -n miarka-processing-service python=3.12
 conda activate miarka-processing-service
-pip3 install -r requirements/dev #skip this if to run code in production
-pip3 install --editable .
+pip3 install --editable .[dev] # For dev environment
+pip3 install -I . # For production environment
 ```
 Run unit tests in dev environment.
 
@@ -51,7 +51,7 @@ POST operations like create directory and start run script will both return a js
 The job id is an int that can be used to get the status of the job.
 
 ```
-{"link": "http://localhost:9999/api/1.0/jobs/12", "version": "1.5.2"}
+{"link": "http://localhost:9999/api/1.0/jobs/12", "version": "1.0.0"}
 ```
 
 To get info on a specific job and its status:

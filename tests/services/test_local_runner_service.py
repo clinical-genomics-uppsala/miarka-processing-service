@@ -5,7 +5,6 @@ import mock
 import tempfile
 import os
 import shutil
-import time
 import signal
 
 import pytest
@@ -30,10 +29,10 @@ class TestLocalRunnerService(object):
     async def test_start_process(
             self,
             job_repo_factory,
-            ):
+    ):
         local_runner_service = LocalRunnerService(
             job_repo_factory,
-            )
+        )
 
         command_in = {
             "command": ["sleep", "1"],
@@ -53,14 +52,14 @@ class TestLocalRunnerService(object):
     async def test_start_process_fail(
             self,
             job_repo_factory,
-            ):
+    ):
         local_runner_service = LocalRunnerService(
             job_repo_factory,
-            )
+        )
 
         command_in = {
             "command": ["fakecommand"],
-            }
+        }
 
         with local_runner_service._job_repo_factory() as job_repo:
             job = job_repo.add_job(command_in=command_in)
@@ -110,15 +109,16 @@ class TestLocalRunnerService(object):
         runscript = "/bin/script.sh"
         inbox = "/data/inbox"
         params = ["--fast", "--debug"]
-        
+
         with mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists", return_value=True), \
              mock.patch("miarka_processing_service.services.local_runner_service.os.path.isfile", return_value=True), \
              mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop:
-            job_id = local_runner_service.start_runscript(analysis_path=analysis_dir, runscript=runscript, inbox_path=inbox, pipeline_params=params)
-            
+            job_id = local_runner_service.start_runscript(analysis_path=analysis_dir, runscript=runscript,
+                                                          inbox_path=inbox, pipeline_params=params)
+
             # Close coroutine to silence warning
             mock_loop.return_value.create_task.call_args[0][0].close()
-            
+
             with local_runner_service._job_repo_factory() as job_repo:
                 job = job_repo.get_job(job_id)
                 # The command is now wrapped in bash -c to handle shell operators correctly
@@ -127,16 +127,15 @@ class TestLocalRunnerService(object):
                 assert job.command == expected_cmd
                 assert job.state == State.PENDING
 
-
     def test_stop_pending_job(self, job_repo_factory):
         local_runner_service = LocalRunnerService(job_repo_factory)
-        
+
         with local_runner_service._job_repo_factory() as job_repo:
             job = job_repo.add_job({"command": ["ls"]})
             job_id = job.job_id
-        
+
         stopped_id = local_runner_service.stop(job_id)
-        
+
         assert stopped_id == job_id
         with local_runner_service._job_repo_factory() as job_repo:
             assert job_repo.get_job(job_id).state == State.CANCELLED
@@ -145,15 +144,15 @@ class TestLocalRunnerService(object):
     def test_stop_started_job(self, mock_kill, job_repo_factory):
         local_runner_service = LocalRunnerService(job_repo_factory)
         test_pid = 1234
-        
+
         with local_runner_service._job_repo_factory() as job_repo:
             job = job_repo.add_job({"command": ["sleep", "100"]})
             job_id = job.job_id
             job_repo.set_state_of_job(job_id, State.STARTED)
             job_repo.set_pid_of_job(job_id, test_pid)
-        
+
         local_runner_service.stop(job_id)
-        
+
         mock_kill.assert_called_once_with(test_pid, signal.SIGTERM)
         with local_runner_service._job_repo_factory() as job_repo:
             assert job_repo.get_job(job_id).state == State.CANCELLED
@@ -168,7 +167,7 @@ class TestLocalRunnerService(object):
         with local_runner_service._job_repo_factory() as job_repo:
             job = job_repo.add_job({"command": ["test"]})
             job_id = job.job_id
-        
+
         fetched_job = local_runner_service.get_job(job_id)
         assert fetched_job.job_id == job_id
 
@@ -177,7 +176,7 @@ class TestLocalRunnerService(object):
         with local_runner_service._job_repo_factory() as job_repo:
             job_repo.add_job({"command": ["cmd1"]})
             job_repo.add_job({"command": ["cmd2"]})
-        
+
         jobs = local_runner_service.get_jobs()
         assert len(jobs) == 2
 
@@ -185,7 +184,7 @@ class TestLocalRunnerService(object):
     async def test_concurrent_jobs(self, job_repo_factory):
         """Verify that multiple jobs can progress independently through PENDING, STARTED, and DONE."""
         local_runner_service = LocalRunnerService(job_repo_factory)
-        
+
         # Resolve the path to the script in miarka_processing_service/scripts/
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         script_path = os.path.join(project_root, "tests", "resources", "scripts", "start_wp1_GMS560.sh")
@@ -198,7 +197,7 @@ class TestLocalRunnerService(object):
         with local_runner_service._job_repo_factory() as job_repo:
             job1_id = job_repo.add_job({"command": command1}).job_id
             job2_id = job_repo.add_job({"command": command2}).job_id
-            
+
             assert job_repo.get_job(job1_id).state == State.PENDING
             assert job_repo.get_job(job2_id).state == State.PENDING
 
@@ -208,7 +207,7 @@ class TestLocalRunnerService(object):
 
         # Yield control so processes can start
         await asyncio.sleep(0.5)
-        
+
         with local_runner_service._job_repo_factory() as job_repo:
             assert job_repo.get_job(job1_id).state == State.STARTED
             assert job_repo.get_job(job2_id).state == State.STARTED
@@ -225,12 +224,12 @@ class TestLocalRunnerService(object):
     def test_start_runscript_fail_empty_inbox(self, job_repo_factory):
         """Verify that an empty inbox-path parameter leads to an ERROR state."""
         local_runner_service = LocalRunnerService(job_repo_factory)
-        
+
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         script_path = os.path.join(project_root, "tests", "resources", "scripts", "start_wp1_GMS560.sh")
-        
+
         # Validation now happens synchronously in start_runscript
-        # In the "empty inbox" test, I used side_effect=[True, False] for exists. 
+        # In the "empty inbox" test, I used side_effect=[True, False] for exists.
         # This simulates the analysis path existing (the first check) but the inbox path not existing (the third check).
         with mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists", side_effect=[True, False]), \
              mock.patch("miarka_processing_service.services.local_runner_service.os.path.isfile", return_value=True):
@@ -241,15 +240,15 @@ class TestLocalRunnerService(object):
     def test_start_runscript_fail_non_existent_analysis_path(self, job_repo_factory):
         """Verify that a non existing analysis path leads to a FileNotFoundError."""
         local_runner_service = LocalRunnerService(job_repo_factory)
-        
+
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         script_path = os.path.join(project_root, "tests", "resources", "scripts", "start_wp1_GMS560.sh")
-        
+
         # Ensure exists returns False for the analysis path
         with mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists", return_value=False):
             with pytest.raises(FileNotFoundError) as exc:
-                local_runner_service.start_runscript(analysis_path="mock/path/does/not/exist", 
-                                                     runscript=script_path, 
+                local_runner_service.start_runscript(analysis_path="mock/path/does/not/exist",
+                                                     runscript=script_path,
                                                      inbox_path="/data/inbox")
             assert "Analysis path does not exist" in str(exc.value)
 
@@ -257,7 +256,7 @@ class TestLocalRunnerService(object):
     async def test_start_runscript_cd_to_analysis_path(self, job_repo_factory):
         """Verify that the runscript runs in the analysis directory."""
         local_runner_service = LocalRunnerService(job_repo_factory)
-        
+
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         inbox_path = os.path.join(project_root, "tests", "resources", "inbox", "ABC-123")
         script_path = os.path.join(project_root, "tests", "resources", "scripts", "start_wp1_GMS560.sh")
@@ -274,7 +273,7 @@ class TestLocalRunnerService(object):
 
             # Manually await the start_process logic to ensure the shell command finishes
             await local_runner_service._start_process(job_id)
-            
+
         complete_file = os.path.join(analysis_path, "Done.txt")
         assert os.path.exists(complete_file)
         os.remove(complete_file)
@@ -287,19 +286,20 @@ class TestLocalRunnerService(object):
         may_exist_filter = []
 
         with mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop, \
-             mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists", side_effect=[True,True,False]):
+             mock.patch("miarka_processing_service.services.local_runner_service.os.path.exists",
+                        side_effect=[True, True, False]):
             job_id = local_runner_service.sync_directory(source_path=source_path,
                                                          destination_path=destination_path,
                                                          filter=filter,
                                                          may_exist_filter=may_exist_filter)
-            
+
             # Close coroutine to silence RunTime warning
             mock_loop.return_value.create_task.call_args[0][0].close()
-            
+
             with local_runner_service._job_repo_factory() as job_repo:
                 job = job_repo.get_job(job_id)
                 expected_cmd = ["rsync", "-avP", source_path, destination_path]
-            
+
                 assert job.command == expected_cmd
                 assert job.state == State.PENDING
 
@@ -317,7 +317,7 @@ class TestLocalRunnerService(object):
                                                          destination_path=destination_path,
                                                          filter=filter,
                                                          may_exist_filter=may_exist_filter)
-            
+
             # Close coroutine to silence RunTime warning
             mock_loop.return_value.create_task.call_args[0][0].close()
 
@@ -325,31 +325,96 @@ class TestLocalRunnerService(object):
             filter_file = os.path.join(source_path, "files_to_outbox.txt")
             m_open.assert_called_once_with(filter_file, "a")
             m_open().write.assert_called_once_with("\n".join(filter) + "\n")
-            
+
             with local_runner_service._job_repo_factory() as job_repo:
                 job = job_repo.get_job(job_id)
                 expected_cmd = ["rsync", "-avP", "--include-from", filter_file, "--exclude", "*", source_path, destination_path]
-            
+
                 assert job.command == expected_cmd
                 assert job.state == State.PENDING
 
-    def test_sync_directory_missing_file(self, job_repo_factory):
-        "What will happen if a file specified in the filter does not exist?"
-        pass
-
-    def test_sync_directory_missing_outbox_directory(self, job_repo_factory):
-        """What will happen if the outbox directory does not exist?"""
-        pass
+    @pytest.fixture
+    def outbox_paths(self):
+        """Real analysis/outbox resource dirs, cleaned up even if the test fails."""
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        source_path = os.path.join(project_root, "tests", "resources", "analysis", "DEF-456")
+        destination_path = os.path.join(project_root, "tests", "resources", "outbox", "DEF-456")
+        os.makedirs(destination_path, exist_ok=True)
+        try:
+            yield source_path, destination_path
+        finally:
+            for entry in os.listdir(destination_path):
+                if entry == ".keep":
+                    continue
+                entry_path = os.path.join(destination_path, entry)
+                if os.path.isdir(entry_path):
+                    shutil.rmtree(entry_path)
+                else:
+                    os.remove(entry_path)
+            filter_file = os.path.join(source_path, "files_to_outbox.txt")
+            if os.path.exists(filter_file):
+                os.remove(filter_file)
 
     @pytest.mark.asyncio
-    async def test_sync_to_outbox(self, job_repo_factory):
+    async def test_sync_directory_missing_file(self, job_repo_factory, outbox_paths):
+        """A filter pattern that matches nothing is skipped by rsync; the job still succeeds."""
+        source_path, destination_path = outbox_paths
         local_runner_service = LocalRunnerService(job_repo_factory)
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        request_data = {"source_directory": os.path.join(project_root, "tests", "resources", "analysis", "DEF-456"),
-                        "destination_directory": os.path.join(project_root, "tests", "resources", "outbox", "DEF-456"),
+
+        with mock.patch("miarka_processing_service.services.local_runner_service.asyncio.get_event_loop") as mock_loop:
+            job_id = local_runner_service.sync_directory(
+                source_path=source_path,
+                destination_path=destination_path,
+                filter=["results/***", "no_such_dir/***", "no_such_config.yaml"],
+                may_exist_filter=["no_such_gvcf_*"])
+
+            # Close coroutine to silence RunTime warning
+            mock_loop.return_value.create_task.call_args[0][0].close()
+
+            # Manually await the start_process logic to ensure the shell command finishes
+            await local_runner_service._start_process(job_id)
+
+        with local_runner_service._job_repo_factory() as job_repo:
+            job = job_repo.get_job(job_id)
+        assert job.state == State.DONE
+
+        # Requested and present in the source -> transferred
+        assert os.path.exists(os.path.join(destination_path, "results"))
+        # Requested but absent from the source -> silently skipped, not an error
+        assert not os.path.exists(os.path.join(destination_path, "no_such_dir"))
+        assert not os.path.exists(os.path.join(destination_path, "no_such_config.yaml"))
+        # Not requested -> not transferred
+        assert not os.path.exists(os.path.join(destination_path, "bam_dna"))
+
+        # may_exist_filter patterns matching nothing are never written to the filter file
+        with open(os.path.join(source_path, "files_to_outbox.txt")) as f:
+            assert "no_such_gvcf_*" not in f.read()
+
+    def test_sync_directory_missing_outbox_directory(self, job_repo_factory, outbox_paths):
+        """A missing destination fails fast: no job queued and no filter file left behind."""
+        source_path, destination_path = outbox_paths
+        local_runner_service = LocalRunnerService(job_repo_factory)
+
+        with pytest.raises(FileNotFoundError):
+            local_runner_service.sync_directory(
+                source_path=source_path,
+                destination_path=os.path.join(destination_path, "does_not_exist"),
+                filter=["results/***"],
+                may_exist_filter=[])
+
+        assert not os.path.exists(os.path.join(source_path, "files_to_outbox.txt"))
+        with local_runner_service._job_repo_factory() as job_repo:
+            assert job_repo.get_jobs() == []
+
+    @pytest.mark.asyncio
+    async def test_sync_to_outbox(self, job_repo_factory, outbox_paths):
+        local_runner_service = LocalRunnerService(job_repo_factory)
+        analysis_dir, outbox_dir = outbox_paths
+        request_data = {"source_directory": analysis_dir,
+                        "destination_directory": outbox_dir,
                         "filter": ["results/***", "bam_*/***", "*config.yaml"],
                         "may_exist_filter": ["gvcf_*"]}
-        
+
         # Simulate handler getting variables from request_data
         source_path = request_data.get("source_directory", "")
         destination_path = request_data.get("destination_directory", "")
@@ -368,7 +433,7 @@ class TestLocalRunnerService(object):
 
             # Manually await the start_process logic to ensure the shell command finishes
             await local_runner_service._start_process(job_id)
-            
+
             with local_runner_service._job_repo_factory() as job_repo:
                 job = job_repo.get_job(job_id)
             assert job.state == State.DONE
@@ -378,10 +443,3 @@ class TestLocalRunnerService(object):
             for dir in expected_dirs:
                 print(os.path.join(destination_path, dir))
                 assert os.path.exists(os.path.join(destination_path, dir))
-
-            for dir in expected_dirs:
-                if os.path.isdir(os.path.join(destination_path, dir)):
-                    shutil.rmtree(os.path.join(destination_path, dir))
-                elif os.path.isfile(os.path.join(destination_path, dir)):
-                    os.remove(os.path.join(destination_path, dir))
-            os.remove(os.path.join(source_path, "files_to_outbox.txt"))

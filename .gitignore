@@ -7,6 +7,9 @@ docs/routes.rst
 # Ignore default database
 miarka_processing.db
 
+# Local service log (dev-environment)
+miarka-processing-service.log.*
+
 # PyCharm
 .idea/
 
@@ -112,10 +115,6 @@ ENV/
 
 # mypy
 .mypy_cache/
-
-# nextflow related files
-work/
-.nextflow*
 
 # apptainer images
 *.sif
